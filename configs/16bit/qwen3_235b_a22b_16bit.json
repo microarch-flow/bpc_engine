@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3-235B-A22B 16-bit weight+KV theoretical deployment",
+    "max_context_tokens": 40960,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "16bit_attention_router_and_lm_head",
+          "parameters": 7374110720,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "16bit_routed_ffn_experts",
+          "layers": 94,
+          "expert_count": 128,
+          "selected_per_token": 8,
+          "parameters_per_expert": 18874368,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 16
+        }
+      ],
+      "weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "94 full-context GQA layers",
+        "layers": 94,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 64,
+              "kv_heads": 4,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 8192
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "Qwen/Qwen3-235B-A22B",
+      "source_config": "https://huggingface.co/Qwen/Qwen3-235B-A22B/blob/main/config.json",
+      "architecture": {
+        "hidden_size": 4096,
+        "layers": 94,
+        "query_heads": 64,
+        "kv_heads": 4,
+        "head_dim": 128,
+        "moe_intermediate_size": 1536,
+        "experts_per_layer": 128,
+        "experts_per_token": 8,
+        "vocab_size": 151936,
+        "tie_word_embeddings": false
+      },
+      "parameter_breakdown": {
+        "attention_projections": 6702497792,
+        "routers": 49283072,
+        "lm_head": 622329856,
+        "always_active_total": 7374110720,
+        "one_routed_expert_per_layer": 18874368,
+        "active_routed_experts": 14193524736,
+        "active_total": 21567635456
+      },
+      "active_parameters": 21567635456,
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. Norms, biases, and elementwise activations are excluded; the untied input embedding table is represented by a row read and the LM head by its full matrix.",
+      "routing_note": "uniform_independent estimates the 16-bit expert-weight union touched by a batch; replace it with explicit_unique when a routing trace is available.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 16 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "qwen3_235b_a22b_bf16.json",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      40960
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

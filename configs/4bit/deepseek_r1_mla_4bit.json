@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "DeepSeek-R1 MLA 4-bit weight+KV theoretical deployment",
+    "max_context_tokens": 131072,
+    "weights": {
+      "always_active_parameters": 16189947904,
+      "routed_expert_groups": [
+        {
+          "name": "routed_ffn_experts",
+          "layers": 58,
+          "expert_count": 256,
+          "selected_per_token": 8,
+          "parameters_per_expert": 44040192,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 4
+        }
+      ],
+      "weight_bits": 4
+    },
+    "layer_groups": [
+      {
+        "name": "full-context MLA layers",
+        "layers": 61,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "latent",
+              "query_heads": 128,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 4,
+              "rope_bits": 4
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 3584
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "source": "DeepSeek-V3/R1 public architecture",
+      "weight_note": "always_active_parameters contains attention, dense FFN, router, shared experts, norms/projections, and LM head; routed experts are separate.",
+      "routing_note": "Uniform independent routing is an analytical expectation, not a serving trace.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 4 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "deepseek_r1_mla_bf16.json",
+        "weight_bits": 4,
+        "kv_bits": 4,
+        "index_bits": 4,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 4,
+    "expert_weight_bits": 4,
+    "kv_bits": 4,
+    "include_kv_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3-8B 8-bit weight+KV theoretical deployment",
+    "max_context_tokens": 40960,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "8bit_attention_ffn_and_lm_head",
+          "parameters": 7568097280,
+          "weight_bits": 8
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 8
+    },
+    "layer_groups": [
+      {
+        "name": "36 full-context GQA layers",
+        "layers": 36,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 32,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 8,
+              "value_bits": 8
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 4096
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "Qwen/Qwen3-8B",
+      "source_config": "https://huggingface.co/Qwen/Qwen3-8B/blob/main/config.json",
+      "architecture": {
+        "hidden_size": 4096,
+        "intermediate_size": 12288,
+        "layers": 36,
+        "query_heads": 32,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 151936,
+        "tie_word_embeddings": false
+      },
+      "parameter_breakdown": {
+        "attention_projections": 1509949440,
+        "dense_ffn": 5435817984,
+        "lm_head": 622329856,
+        "always_active_total": 7568097280
+      },
+      "active_parameters": 7568097280,
+      "parameter_count_convention": "Counts matrix and convolution weights executed for one decode token. Norms, biases, elementwise activations, and the full input embedding table are excluded; the LM head is included.",
+      "embedding_note": "The untied input embedding is represented as one 8-bit row read (4096 elements) per request.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 8 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "qwen3_8b_bf16.json",
+        "weight_bits": 8,
+        "kv_bits": 8,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 8,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      40960
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

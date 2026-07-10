@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "DeepSeek-V4-Pro 8-bit weight+KV theoretical deployment",
+    "max_context_tokens": 1048576,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "8bit_non_expert_weights",
+          "parameters": 20557332480,
+          "weight_bits": 8
+        },
+        {
+          "name": "8bit_shared_experts",
+          "parameters": 4029677568,
+          "weight_bits": 8
+        },
+        {
+          "name": "8bit_mhc_weights",
+          "parameters": 84066304,
+          "weight_bits": 8
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "8bit_routed_experts",
+          "layers": 61,
+          "expert_count": 384,
+          "selected_per_token": 6,
+          "parameters_per_expert": 66060288,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 8
+        }
+      ],
+      "weight_bits": 8
+    },
+    "layer_groups": [
+      {
+        "name": "31 HCA layers",
+        "layers": 31,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "sliding_window",
+              "window_tokens": 128
+            }
+          },
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "compressed_full",
+              "compression_ratio": 128
+            }
+          }
+        ]
+      },
+      {
+        "name": "30 CSA layers",
+        "layers": 30,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "sliding_window",
+              "window_tokens": 128
+            }
+          },
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "learned_topk",
+              "top_k": 1024,
+              "compression_ratio": 4,
+              "index_entry_elements": 128,
+              "index_query_heads": 64,
+              "index_head_dim": 128,
+              "index_bits": 4
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 7168
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "source_config": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/config.json",
+      "source_report": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf",
+      "active_parameters": 48849141760,
+      "notes": "The 61 configured layers contain 31 HCA and 30 CSA layers. This generated profile forces every model weight and shared-KV element to 8 bits. Index/state precision remains separate. Quantization metadata and uncompressed compression-tail state are not included.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 8 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "deepseek_v4_pro.json",
+        "weight_bits": 8,
+        "kv_bits": 8,
+        "index_bits": 4,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 8,
+    "index_bits": 4,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      524288,
+      1048576
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "state-spaces Mamba-2.8B 4-bit weight+KV theoretical deployment",
+    "max_context_tokens": null,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "4bit_projection_convolution_and_tied_lm_head",
+          "parameters": 2761953280,
+          "weight_bits": 4
+        },
+        {
+          "name": "4bit_A_log_and_D",
+          "parameters": 5570560,
+          "weight_bits": 4
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 4
+    },
+    "layer_groups": [
+      {
+        "name": "64 pure Mamba-1 layers",
+        "layers": 64,
+        "mixers": [
+          {
+            "kind": "mamba",
+            "variant": "mamba1",
+            "inner_dim": 5120,
+            "state_dim": 16,
+            "conv_kernel": 4,
+            "recurrence_flops_per_state_element": 5,
+            "state_bits": 16
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 1280
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "state-spaces/mamba-2.8b",
+      "source_config": "https://huggingface.co/state-spaces/mamba-2.8b/blob/main/config.json",
+      "source_mamba_module": "https://github.com/state-spaces/mamba/blob/main/mamba_ssm/modules/mamba_simple.py",
+      "source_model_config": "https://github.com/state-spaces/mamba/blob/main/mamba_ssm/models/config_mamba.py",
+      "source_paper": "https://arxiv.org/abs/2312.00752",
+      "architecture": {
+        "hidden_size": 2560,
+        "layers": 64,
+        "expand": 2,
+        "inner_dim": 5120,
+        "state_dim": 16,
+        "conv_kernel": 4,
+        "time_step_rank": 160,
+        "vocab_size_unpadded": 50277,
+        "vocab_size_padded": 50280,
+        "tie_word_embeddings": true
+      },
+      "parameter_breakdown": {
+        "4bit_layer_projection_and_conv_weights": 2633236480,
+        "4bit_A_log_and_D": 5570560,
+        "4bit_tied_lm_head": 128716800,
+        "always_active_total": 2767523840
+      },
+      "active_parameters": 2767523840,
+      "state_breakdown_per_layer": {
+        "ssm_state_elements": 81920,
+        "conv_state_elements": 20480,
+        "total_state_elements": 102400,
+        "core_recurrence_flops": 409600
+      },
+      "context_note": "Mamba has no architectural KV-cache context bound, so max_context_tokens is null. The checkpoint's training/evaluation length still limits model quality and is not a memory-structure limit.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 4 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "recurrence_note": "The five-FLOP coefficient covers the core diagonal state update and output contraction. Discretization exponentials, gates, activations, and normalization are not assigned hardware-independent FLOP equivalents.",
+      "parameter_count_convention": "Counts matrix and convolution weights executed for one decode token. Norms and biases are excluded. The tied embedding matrix is counted once as the full LM-head operation, plus one 4-bit row read for input lookup.",
+      "precision_profile": {
+        "base_config": "mamba_2_8b_bf16.json",
+        "weight_bits": 4,
+        "kv_bits": 4,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 4,
+    "expert_weight_bits": 4,
+    "kv_bits": 4,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      524288,
+      1048576
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

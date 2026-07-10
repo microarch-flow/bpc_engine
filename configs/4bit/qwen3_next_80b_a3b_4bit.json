@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3-Next-80B-A3B-Instruct hybrid DeltaNet+GQA 4-bit weight+KV theoretical deployment",
+    "max_context_tokens": 262144,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "4bit_token_mixers_router_shared_experts_and_lm_head",
+          "parameters": 2053603328,
+          "weight_bits": 4
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "4bit_routed_ffn_experts",
+          "layers": 48,
+          "expert_count": 512,
+          "selected_per_token": 10,
+          "parameters_per_expert": 3145728,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 4
+        }
+      ],
+      "weight_bits": 4
+    },
+    "layer_groups": [
+      {
+        "name": "36 Gated DeltaNet linear-attention layers",
+        "layers": 36,
+        "mixers": [
+          {
+            "kind": "linear_attention",
+            "query_heads": 32,
+            "key_dim": 128,
+            "value_dim": 128,
+            "normalizer_state": false,
+            "extra_flops_per_token": 1581056,
+            "state_bits": 16
+          },
+          {
+            "kind": "recurrent_state",
+            "state_elements": 32768,
+            "read_elements_per_token": 32768,
+            "write_elements_per_token": 32768,
+            "flops_per_token": 0,
+            "state_bits": 16
+          }
+        ]
+      },
+      {
+        "name": "12 full-context gated GQA layers",
+        "layers": 12,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 16,
+              "kv_heads": 2,
+              "head_dim": 256,
+              "key_bits": 4,
+              "value_bits": 4
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 1024
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "source_config": "https://huggingface.co/Qwen/Qwen3-Next-80B-A3B-Instruct/blob/main/config.json",
+      "source_implementation": "https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3_next/modeling_qwen3_next.py",
+      "architecture": {
+        "hidden_size": 2048,
+        "layers": 48,
+        "full_attention_interval": 4,
+        "linear_attention_layers": 36,
+        "full_attention_layers": 12,
+        "linear_key_heads": 16,
+        "linear_value_heads": 32,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128,
+        "linear_conv_kernel": 4,
+        "full_query_heads": 16,
+        "full_kv_heads": 2,
+        "full_head_dim": 256,
+        "experts_per_layer": 512,
+        "experts_per_token": 10,
+        "moe_intermediate_size": 512,
+        "shared_expert_intermediate_size": 512,
+        "vocab_size": 151936,
+        "tie_word_embeddings": false
+      },
+      "parameter_breakdown": {
+        "linear_attention_mixer_weights": 1213857792,
+        "full_attention_mixer_weights": 327155712,
+        "routers_shared_experts_and_shared_gates": 201424896,
+        "lm_head": 311164928,
+        "always_active_total": 2053603328,
+        "one_routed_expert_per_layer": 3145728,
+        "active_routed_experts": 1509949440,
+        "active_total": 3563552768
+      },
+      "active_parameters": 3563552768,
+      "deltanet_state": {
+        "matrix_elements_per_layer": 524288,
+        "conv_elements_per_layer": 32768,
+        "total_state_elements_per_linear_layer": 557056,
+        "recurrence_flops_per_linear_layer": 3678208
+      },
+      "deltanet_flop_note": "The base linear_attention mixer contributes 4 FLOPs per matrix element. The configured 1,581,056 extra FLOPs add state decay, the extra DeltaNet update term, and beta application so the recurrence totals 7*matrix_elements + 2*heads*value_dim. L2 normalization, nonlinear gates, and scalar exponentials are excluded.",
+      "conv_state_note": "The second recurrent_state mixer represents the 8192-channel, width-4 causal-convolution cache. Convolution weight MACs are already in always-active parameters, so it contributes state traffic but zero additional parameter-free FLOPs.",
+      "parameter_count_convention": "Counts matrix and convolution weights executed for one decode token. Norms, biases, small scalar state parameters, elementwise activations, and the full input embedding table are excluded; the LM head is included.",
+      "routing_note": "uniform_independent is an analytical batch-reuse assumption and should be replaced by explicit_unique when a serving trace is available.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 4 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "qwen3_next_80b_a3b_bf16.json",
+        "weight_bits": 4,
+        "kv_bits": 4,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 4,
+    "expert_weight_bits": 4,
+    "kv_bits": 4,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      262144
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

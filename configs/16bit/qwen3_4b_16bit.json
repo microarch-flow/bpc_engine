@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3-4B 16-bit weight+KV theoretical deployment",
+    "max_context_tokens": 40960,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "16bit_attention_ffn_and_tied_lm_head",
+          "parameters": 4022272000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "36 full-context GQA layers",
+        "layers": 36,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 32,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 5120
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "Qwen/Qwen3-4B",
+      "source_config": "https://huggingface.co/Qwen/Qwen3-4B/blob/main/config.json",
+      "architecture": {
+        "hidden_size": 2560,
+        "intermediate_size": 9728,
+        "layers": 36,
+        "query_heads": 32,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 151936,
+        "tie_word_embeddings": true
+      },
+      "parameter_breakdown": {
+        "attention_projections": 943718400,
+        "dense_ffn": 2689597440,
+        "tied_lm_head": 388956160,
+        "always_active_total": 4022272000
+      },
+      "active_parameters": 4022272000,
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. Norms, biases, and elementwise activations are excluded. The tied embedding matrix is counted once as the full LM-head matrix operation.",
+      "embedding_note": "Input lookup is a separate 16-bit row-read operation (2560 elements), even though the same matrix is subsequently used by the LM head.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 16 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "qwen3_4b_bf16.json",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      40960
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Mechanism catalog example (not a released checkpoint)",
+    "max_context_tokens": 1048576,
+    "weights": {
+      "always_active_parameters": 0,
+      "routed_expert_groups": []
+    },
+    "layer_groups": [
+      {
+        "name": "MHA with full history",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mha",
+              "query_heads": 32,
+              "head_dim": 128
+            },
+            "access": {"kind": "full"}
+          }
+        ]
+      },
+      {
+        "name": "MQA with SWA",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mqa",
+              "query_heads": 32,
+              "head_dim": 128
+            },
+            "access": {"kind": "swa", "window_tokens": 4096}
+          }
+        ]
+      },
+      {
+        "name": "GQA with DSA",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 32,
+              "kv_heads": 8,
+              "head_dim": 128
+            },
+            "access": {
+              "kind": "dsa",
+              "top_k": 2048,
+              "index_entry_elements": 64,
+              "index_query_heads": 64,
+              "index_head_dim": 64,
+              "index_bits": 8
+            }
+          }
+        ]
+      },
+      {
+        "name": "MLA with full history",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 128,
+              "latent_dim": 512,
+              "rope_dim": 64
+            },
+            "access": {"kind": "full"}
+          }
+        ]
+      },
+      {
+        "name": "CSA compressed branch plus SWA branch",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared_kv",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 16
+            },
+            "access": {"kind": "swa", "window_tokens": 128}
+          },
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared_kv",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64,
+              "non_rope_bits": 8,
+              "rope_bits": 16
+            },
+            "access": {
+              "kind": "csa",
+              "compression_ratio": 4,
+              "top_k": 1024,
+              "index_entry_elements": 128,
+              "index_query_heads": 64,
+              "index_head_dim": 128,
+              "index_bits": 4
+            }
+          }
+        ]
+      },
+      {
+        "name": "HCA compressed branch plus SWA branch",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared_kv",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64
+            },
+            "access": {"kind": "swa", "window_tokens": 128}
+          },
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "shared_kv",
+              "query_heads": 128,
+              "head_dim": 512,
+              "rope_dim": 64
+            },
+            "access": {"kind": "hca", "compression_ratio": 128}
+          }
+        ]
+      },
+      {
+        "name": "normalized linear attention",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "linear_attention",
+            "query_heads": 32,
+            "key_dim": 128,
+            "value_dim": 128,
+            "normalizer_state": true
+          }
+        ]
+      },
+      {
+        "name": "generic diagonal SSM",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "ssm",
+            "channels": 8192,
+            "state_dim": 16,
+            "conv_state_length": 0
+          }
+        ]
+      },
+      {
+        "name": "Mamba-1",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "mamba",
+            "variant": "mamba1",
+            "inner_dim": 8192,
+            "state_dim": 16,
+            "conv_kernel": 4
+          }
+        ]
+      },
+      {
+        "name": "Mamba-2",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "mamba2",
+            "inner_dim": 8192,
+            "ssm_dim": 8192,
+            "state_dim": 128,
+            "conv_kernel": 4,
+            "groups": 1
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "purpose": "Syntax and formula demonstration only. Do not use this aggregate as a real model curve."
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "kv_bits": 8,
+    "index_bits": 8,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true
+  },
+  "analysis": {
+    "contexts": [128, 4096, 131072],
+    "batches": [1, 32]
+  }
+}

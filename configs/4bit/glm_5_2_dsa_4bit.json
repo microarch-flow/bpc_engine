@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "GLM-5.2 MLA+DSA IndexShare 4-bit weight+KV theoretical deployment",
+    "max_context_tokens": 1048576,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "4bit_main_mla_dense_shared_experts_and_lm_head",
+          "parameters": 17333747712,
+          "weight_bits": 4
+        },
+        {
+          "name": "4bit_indexer_query_and_key_projections",
+          "parameters": 192675840,
+          "weight_bits": 4
+        },
+        {
+          "name": "4bit_moe_routers",
+          "parameters": 117964800,
+          "weight_bits": 4
+        },
+        {
+          "name": "4bit_indexer_head_weight_projections",
+          "parameters": 4128768,
+          "weight_bits": 4
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "4bit_routed_ffn_experts",
+          "layers": 75,
+          "expert_count": 256,
+          "selected_per_token": 8,
+          "parameters_per_expert": 37748736,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 4
+        }
+      ],
+      "weight_bits": 4
+    },
+    "layer_groups": [
+      {
+        "name": "21 MLA+DSA layers with full indexers",
+        "layers": 21,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 4,
+              "rope_bits": 4
+            },
+            "access": {
+              "kind": "dsa",
+              "top_k": 2048,
+              "index_entry_elements": 128,
+              "index_query_heads": 32,
+              "index_head_dim": 128,
+              "index_bits": 16,
+              "selection_flops_per_candidate": 65
+            }
+          }
+        ]
+      },
+      {
+        "name": "57 MLA+DSA layers reusing shared top-k indices",
+        "layers": 57,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 4,
+              "rope_bits": 4
+            },
+            "access": {
+              "kind": "fixed_topk",
+              "top_k": 2048
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 3072
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "zai-org/GLM-5.2",
+      "source_config": "https://huggingface.co/zai-org/GLM-5.2/blob/main/config.json",
+      "source_model_card": "https://huggingface.co/zai-org/GLM-5.2",
+      "source_glm_report": "https://arxiv.org/abs/2602.15763",
+      "source_indexshare_report": "https://arxiv.org/abs/2603.12201",
+      "architecture": {
+        "hidden_size": 6144,
+        "layers": 78,
+        "dense_layers": 3,
+        "moe_layers": 75,
+        "query_heads": 64,
+        "q_lora_rank": 2048,
+        "kv_lora_rank": 512,
+        "qk_nope_head_dim": 192,
+        "qk_rope_head_dim": 64,
+        "value_head_dim": 256,
+        "indexer_layers": 21,
+        "shared_index_layers": 57,
+        "index_heads": 32,
+        "index_head_dim": 128,
+        "index_top_k": 2048,
+        "experts_per_layer": 256,
+        "experts_per_token": 8,
+        "shared_experts_per_layer": 1,
+        "moe_intermediate_size": 2048,
+        "vocab_size": 154880,
+        "tie_word_embeddings": false
+      },
+      "parameter_breakdown": {
+        "main_mla_projections": 12871532544,
+        "4bit_indexer_query_and_key_projections": 192675840,
+        "4bit_indexer_head_weight_projections": 4128768,
+        "three_dense_ffns": 679477248,
+        "shared_experts": 2831155200,
+        "4bit_routers": 117964800,
+        "lm_head": 951582720,
+        "always_active_total": 17648517120,
+        "one_routed_expert_per_layer": 37748736,
+        "active_routed_experts": 22649241600,
+        "active_total": 40297758720
+      },
+      "active_parameters": 40297758720,
+      "indexshare_pattern": "Layers 0, 1, 2, 6, 10, ..., 74 run an indexer (21 total); the other 57 layers reuse the most recent top-k indices. Grouping layers by cost preserves the exact decode sum even though it does not preserve display order.",
+      "dsa_note": "Full indexer layers scan one 128-element BF16 key per prior token. The 65 extra FLOPs/candidate represent ReLU plus a 32-head weighted reduction; top-k sorting is excluded.",
+      "mla_note": "Main attention uses the absorbed MLA convention and stores only the 512-element latent plus the 64-element RoPE key per token and layer.",
+      "mtp_note": "The one next-token-prediction layer is excluded from ordinary one-token autoregressive decode; it belongs to an optional speculative decoding path.",
+      "parameter_count_convention": "Counts matrix weights executed for one ordinary decode token. Norms, biases, correction buffers, elementwise activations, and the full input embedding table are excluded; the LM head is included.",
+      "routing_note": "uniform_independent is an analytical batch-reuse assumption and should be replaced by explicit_unique when a serving trace is available.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 4 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "glm_5_2_dsa_bf16.json",
+        "weight_bits": 4,
+        "kv_bits": 4,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 4,
+    "expert_weight_bits": 4,
+    "kv_bits": 4,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      524288,
+      1048576
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

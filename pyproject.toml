@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ebpc-decode-engine"
+version = "0.1.0"
+description = "Config-driven per-token workload calculator for LLM decode"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+decode-engine = "decode_engine.cli:main"
+
+[tool.setuptools]
+packages = ["decode_engine"]

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Llama-3.3-70B-Instruct 16-bit weight+KV theoretical deployment",
+    "max_context_tokens": 131072,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "16bit_attention_ffn_and_lm_head",
+          "parameters": 69501714432,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "80 full-context GQA layers",
+        "layers": 80,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 64,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 16384
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "checkpoint": "meta-llama/Llama-3.3-70B-Instruct",
+      "source_model_card": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_3/MODEL_CARD.md",
+      "source_config": "https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct/blob/main/config.json",
+      "architecture": {
+        "hidden_size": 8192,
+        "intermediate_size": 28672,
+        "layers": 80,
+        "query_heads": 64,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 128256,
+        "tie_word_embeddings": false
+      },
+      "parameter_breakdown": {
+        "attention_projections": 12079595520,
+        "dense_ffn": 56371445760,
+        "lm_head": 1050673152,
+        "always_active_total": 69501714432
+      },
+      "active_parameters": 69501714432,
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. Norms, biases, and elementwise activations are excluded; the untied input embedding table is represented by a row read and the LM head by its full matrix.",
+      "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 16 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",
+      "precision_profile": {
+        "base_config": "llama_3_3_70b_bf16.json",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "index_bits": 16,
+        "state_bits": 16
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}
