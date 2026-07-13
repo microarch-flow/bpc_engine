@@ -16,7 +16,9 @@
           "weight_bits": 4
         }
       ],
-      "weight_bits": 4
+      "weight_bits": 4,
+      "output_head_parameters": 926679040,
+      "output_head_weight_bits": 4
     },
     "layer_groups": [
       {
@@ -55,6 +57,8 @@
     ],
     "metadata": {
       "source": "DeepSeek-V3/R1 public architecture",
+      "output_head_note": "LM head = hidden_size 7168 * vocab_size 129280 = 926679040 parameters; the official config sets tie_word_embeddings=false.",
+      "output_head_source": "https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/main/config.json",
       "weight_note": "always_active_parameters contains attention, dense FFN, router, shared experts, norms/projections, and LM head; routed experts are separate.",
       "routing_note": "Uniform independent routing is an analytical expectation, not a serving trace.",
       "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 4 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",

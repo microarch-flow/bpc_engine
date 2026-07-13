@@ -299,9 +299,21 @@ def write_csv(rows: Iterable[dict[str, Any]], path: Path) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)
+        writer = csv.DictWriter(
+            handle, fieldnames=CSV_FIELDS, lineterminator="\n"
+        )
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _normalize_svg(path: Path) -> None:
+    """Remove renderer-added line-end spaces from an SVG artifact."""
+
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        "\n".join(line.rstrip() for line in text.splitlines()) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _series_rows(
@@ -433,7 +445,9 @@ def render_chart(
         dpi=220,
         facecolor="white",
     )
-    fig.savefig(output_stem.with_suffix(".svg"), facecolor="white")
+    svg_path = output_stem.with_suffix(".svg")
+    fig.savefig(svg_path, facecolor="white")
+    _normalize_svg(svg_path)
     plt.close(fig)
 
 

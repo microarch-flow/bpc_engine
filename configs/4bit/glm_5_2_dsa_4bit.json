@@ -37,7 +37,9 @@
           "weight_bits": 4
         }
       ],
-      "weight_bits": 4
+      "weight_bits": 4,
+      "output_head_parameters": 951582720,
+      "output_head_weight_bits": 4
     },
     "layer_groups": [
       {

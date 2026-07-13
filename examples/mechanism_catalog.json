@@ -209,6 +209,12 @@
   },
   "analysis": {
     "contexts": [128, 4096, 131072],
-    "batches": [1, 32]
+    "batches": [1, 32],
+    "prefill": {
+      "prompt_lengths": [128, 512, 2048, 8192],
+      "batches": [1, 32],
+      "token_budgets": [4096],
+      "ragged_batches": [[128, 512, 2048, 64]]
+    }
   }
 }

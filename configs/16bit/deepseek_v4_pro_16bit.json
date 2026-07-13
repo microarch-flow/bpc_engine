@@ -32,7 +32,9 @@
           "weight_bits": 16
         }
       ],
-      "weight_bits": 16
+      "weight_bits": 16,
+      "output_head_parameters": 926679040,
+      "output_head_weight_bits": 16
     },
     "layer_groups": [
       {
@@ -129,6 +131,7 @@
     "metadata": {
       "source_config": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/config.json",
       "source_report": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf",
+      "output_head_note": "LM head = hidden_size 7168 * vocab_size 129280 = 926679040 parameters; the official config sets tie_word_embeddings=false.",
       "active_parameters": 48849141760,
       "notes": "The 61 configured layers contain 31 HCA and 30 CSA layers. This generated profile forces every model weight and shared-KV element to 16 bits. Index/state precision remains separate. Quantization metadata and uncompressed compression-tail state are not included.",
       "precision_note": "Uniform theoretical profile: every model weight and KV-cache element is 16 bits. Index-cache and recurrent-state precision remain as specified by the base architecture. Quantization scales, zero-points, and packing metadata are not included.",

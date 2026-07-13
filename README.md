@@ -1,11 +1,14 @@
-# LLM Decode 每 Token 工作量计算引擎
+# LLM Decode 与 Prefill 工作量计算引擎
 
-这个目录提供一个配置驱动的 Python 计算引擎，用于计算 LLM 在 decode 阶段每生成一个 token 所需的：
+这个目录提供一个配置驱动的 Python 计算引擎，用于计算 LLM 在
+decode 与 prefill 阶段的工作量：
 
 - 参数矩阵计算量、注意力扫描计算量、索引计算量和状态更新计算量；
 - 权重读取、KV Cache 读写、索引读写、固定状态读写和激活溢出流量；
 - `Byte/FLOP`，以及等价的 `TB/s per PFLOPS`；
-- 每个请求的 KV、索引及固定状态容量。
+- 每个请求的 KV、索引及固定状态容量；
+- prefill 的有效/实际执行 token、full-causal pair slots、padding 效率，
+  以及 compulsory logical-HBM 与 pair-stream operand 两种流量视图。
 
 项目只依赖 Python 标准库，建议使用 Python 3.10 或更高版本。
 
@@ -34,8 +37,8 @@ per_output_token_work = step_work / batch_size
 
 ```bash
 python3 -m decode_engine \
-  --config configs/gqa_8b_document_example.json \
-  --contexts 128 512 2048 8192 32768 131072 \
+  --config configs/16bit/qwen3_8b_16bit.json \
+  --contexts 128 512 2048 8192 32768 40960 \
   --batches 1 32
 ```
 
@@ -43,7 +46,7 @@ python3 -m decode_engine \
 
 ```bash
 python3 -m decode_engine \
-  --config configs/deepseek_r1_mla_bf16.json \
+  --config configs/16bit/deepseek_r1_mla_16bit.json \
   --format csv \
   --output deepseek_r1_decode.csv
 ```
@@ -52,17 +55,17 @@ python3 -m decode_engine \
 
 | 配置 | 主要序列机制 | 默认部署精度 |
 |---|---|---|
-| `deepseek_r1_mla_bf16.json` | MLA | BF16 |
-| `deepseek_v4_pro.json` | shared-KV + HCA/CSA | 官方 FP8/FP4 混合精度 |
-| `glm_5_2_dsa_bf16.json` | MLA + DSA + IndexShare | BF16，router/index head 为 FP32 |
-| `qwen3_235b_a22b_bf16.json` | GQA + MoE | BF16 |
-| `llama_3_3_70b_bf16.json` | GQA | BF16 |
-| `qwen3_8b_bf16.json` | GQA | BF16 |
-| `qwen3_4b_bf16.json` | GQA | BF16 |
-| `qwen3_next_80b_a3b_bf16.json` | Gated DeltaNet + GQA + MoE | BF16 |
-| `mamba_2_8b_bf16.json` | Mamba-1 SSM | BF16，A_log/D 为 FP32 |
+| `deepseek_r1_mla_{bits}bit.json` | MLA | 统一 4/8/16-bit profile |
+| `deepseek_v4_pro_{bits}bit.json` | shared-KV + HCA/CSA | 统一 4/8/16-bit profile |
+| `glm_5_2_dsa_{bits}bit.json` | MLA + DSA + IndexShare | 统一 4/8/16-bit profile |
+| `qwen3_235b_a22b_{bits}bit.json` | GQA + MoE | 统一 4/8/16-bit profile |
+| `llama_3_3_70b_{bits}bit.json` | GQA | 统一 4/8/16-bit profile |
+| `qwen3_8b_{bits}bit.json` | GQA | 统一 4/8/16-bit profile |
+| `qwen3_4b_{bits}bit.json` | GQA | 统一 4/8/16-bit profile |
+| `qwen3_next_80b_a3b_{bits}bit.json` | Gated DeltaNet + GQA + MoE | 统一 4/8/16-bit profile |
+| `mamba_2_8b_{bits}bit.json` | Mamba-1 SSM | 统一 4/8/16-bit profile |
 
-V4-Pro 配置把 31 个 HCA 层和 30 个 CSA 层拆成 window、compressed 和 learned-top-k 分支，并保留 FP8 shared expert、FP4 routed expert、FP32 mHC 等权重组的不同位宽。GLM-5.2 则把 21 个实际执行 DSA indexer 的层与 57 个复用 top-k 结果的层分开，避免把 IndexShare 错算成每层都扫描索引。
+这些文件分别位于 `configs/{4bit,8bit,16bit}/`。V4-Pro 配置把 31 个 HCA 层和 30 个 CSA 层拆成 window、compressed 和 learned-top-k 分支；GLM-5.2 则把 21 个实际执行 DSA indexer 的层与 57 个复用 top-k 结果的层分开，避免把 IndexShare 错算成每层都扫描索引。统一 profile 强制 weight/KV 使用目录对应位宽，index/state 仍保留独立配置。
 
 每个真实模型配置的 `metadata` 都保存了官方来源、原始结构字段、活跃参数拆分以及未计入项。JSON 不支持注释，因此这些元数据就是配置的可审计说明，不参与引擎公式。
 
@@ -70,7 +73,65 @@ V4-Pro 配置把 31 个 HCA 层和 30 个 CSA 层拆成 window、compressed 和 
 
 如果不传 `--contexts` 和 `--batches`，CLI 使用配置文件中 `analysis` 下的默认值。
 
-### 2.1 生成统一数据与曲线
+### 2.1 Prefill 与三组标准实验
+
+Prefill 的完整指标定义、`B/L/T`、ragged、padding/varlen/packing 和
+数据搬运边界见 [Prefill 工作量指标与三组标准实验](docs/prefill_metrics.md)。
+
+实验一固定请求 batch，扫描等长 prompt：
+
+```bash
+python3 -m decode_engine \
+  --phase prefill \
+  --experiment equal \
+  --config configs/16bit/qwen3_8b_16bit.json \
+  --prompt-lengths 128 512 2048 8192 \
+  --batches 1 32
+```
+
+实验二固定一次 prefill 的总 token budget，改变这些 token 由多少个请求组成：
+
+```bash
+python3 -m decode_engine \
+  --phase prefill \
+  --experiment token-budget \
+  --config configs/16bit/qwen3_8b_16bit.json \
+  --token-budgets 4096 \
+  --batches 1 4 16 32
+```
+
+实验三输入一个真实的非等长（ragged）batch；将 `varlen` 改成 `padded`
+即可观察 padding 造成的 executed work 增量：
+
+```bash
+python3 -m decode_engine \
+  --phase prefill \
+  --experiment ragged \
+  --config configs/16bit/qwen3_8b_16bit.json \
+  --ragged-lengths 128 512 2048 64 \
+  --execution-mode varlen
+```
+
+Prefix-cache/chunk 的 sequence 成本可为同一个 ragged vector 增加等长的
+cached-length vector；若要严格复用当前 decode 的“只算历史 entry”边界，
+可以排除 causal 自身对角项：
+
+```bash
+python3 -m decode_engine \
+  --phase prefill \
+  --experiment ragged \
+  --config configs/16bit/qwen3_8b_16bit.json \
+  --ragged-lengths 128 64 \
+  --cached-lengths 1024 4096 \
+  --exclude-self-attention \
+  --format json
+```
+
+三组实验共用长度向量接口。默认采用在线推理常见的 `logits-mode=last`、
+包含 causal 对角项，并把 attention/index 的 pair-stream operand 流量单列，
+不与默认 logical-HBM bytes 相加。
+
+### 2.2 生成统一数据与曲线
 
 绘图是可选功能，计算引擎本身仍只依赖 Python 标准库。先在隔离环境中安装绘图依赖：
 
@@ -84,6 +145,8 @@ python3 -m venv .venv
 ```bash
 .venv/bin/python scripts/generate_precision_configs.py --bits 4 8 16
 ```
+
+#### Decode 数据与曲线
 
 分别生成三种精度的统一数据和两张 batch 曲线：
 
@@ -111,9 +174,82 @@ python3 -m venv .venv
 
 为了让所有模型都有完整的 14 个横轴点，脚本会对超过配置中 `max_context_tokens` 的位置作理论外推。外推点在 CSV 中标记为 `is_extrapolated=true`，图中使用虚线；它们表示架构公式的延伸，不代表 checkpoint 官方支持该上下文长度。
 
+#### Prefill 数据与曲线
+
+Prefill 使用一个统一脚本。下面三条命令分别读取对应精度目录中的全部
+模型配置；每条命令默认一次生成 equal、token-budget 和 ragged 三组实验的
+原始结果、CSV 和图片：
+
+```bash
+.venv/bin/python scripts/generate_prefill_plots.py --precision 4
+.venv/bin/python scripts/generate_prefill_plots.py --precision 8
+.venv/bin/python scripts/generate_prefill_plots.py --precision 16
+```
+
+默认输出位于 `outputs/prefill/{4bit,8bit,16bit}/`。以 16-bit 为例，顶层包含：
+
+- `prefill_all_detail.csv`：所有模型、三组实验的完整工作量分项；
+- `prefill_all_summary.csv`：适合直接分析和绘图的主要指标；
+- `prefill_all.json`：保留长度向量、cache、各工作量分项等完整结构化结果；
+- `equal/`、`token_budget/` 和 `ragged/`：各实验自己的 detail CSV、
+  summary CSV、JSON、PNG 和 SVG；每张工作量图还有同名的 summary CSV。
+
+图片按实验语义拆分：equal 为每个 batch 一张 prompt-length 曲线，
+token-budget 为每个总 token budget 一张 batch 曲线，ragged 同时输出不同
+execution mode 的工作量图与 padding/执行效率对比图。CSV 与 JSON 是图片的
+数据来源，同一次运行中的图和数据使用完全相同的配置与实验点。
+每张工作量图同时给出每有效输入 token 的计算量、logical-HBM 搬运量、
+operand-stream 流量边界和带宽/计算比；两种流量边界只作并列比较，不能相加。
+重复使用同一输出目录时，脚本只清理上述约定名称的旧产物；请把自建文件放在
+其他名称或目录下，避免与生成器的输出命名空间冲突。
+
+只运行实验一，并自定义等长 prompt 与 batch：
+
+```bash
+.venv/bin/python scripts/generate_prefill_plots.py \
+  --precision 16 \
+  --experiments equal \
+  --prompt-lengths 128 512 2048 8192 \
+  --equal-batches 1 32 \
+  --execution-mode varlen \
+  --output-dir outputs/prefill/equal_example
+```
+
+只运行实验二，扫描固定总 token 数下的不同请求数：
+
+```bash
+.venv/bin/python scripts/generate_prefill_plots.py \
+  --precision 16 \
+  --experiments token-budget \
+  --token-budgets 4096 16384 \
+  --token-budget-batches 1 4 16 32 \
+  --execution-mode varlen \
+  --output-dir outputs/prefill/token_budget_example
+```
+
+只运行实验三；`--ragged-lengths` 可以重复，用来输入多个真实 batch，默认
+同时比较 `varlen` 与 `padded`：
+
+```bash
+.venv/bin/python scripts/generate_prefill_plots.py \
+  --precision 16 \
+  --experiments ragged \
+  --ragged-lengths 128 512 2048 64 \
+  --ragged-lengths 256 256 1024 4096 \
+  --ragged-execution-modes varlen padded \
+  --output-dir outputs/prefill/ragged_example
+```
+
+`--experiments` 也可以同时接收多个实验名；默认值是 `all`。其他常用选项
+包括 `--models`（只选择部分模型）、`--config-dir`、`--logits-mode`、
+`--exclude-self-attention` 和 `--dpi`。脚本只是批量调用同一 Prefill 计算
+引擎并保存结果，不会实际加载模型或执行推理。
+
 ## 3. 配置结构
 
-一个配置文件描述“模型结构 + 部署选择 + 默认扫描范围”：
+一个配置文件描述“模型结构 + 部署选择 + 默认扫描范围”。下面只展示字段
+结构，其中空的 `weights/layer_groups/deployment` 不是可执行配置；可执行示例见
+`examples/mechanism_catalog.json` 和 `configs/{4bit,8bit,16bit}/`：
 
 ```json
 {
@@ -128,7 +264,13 @@ python3 -m venv .venv
   "deployment": {},
   "analysis": {
     "contexts": [128, 512, 2048],
-    "batches": [1, 32]
+    "batches": [1, 32],
+    "prefill": {
+      "prompt_lengths": [128, 512, 2048],
+      "batches": [1, 32],
+      "token_budgets": [4096],
+      "ragged_batches": [[128, 512, 2048, 64]]
+    }
   }
 }
 ```
@@ -138,6 +280,8 @@ python3 -m venv .venv
 ```json
 "weights": {
   "always_active_parameters": 8000000000,
+  "output_head_parameters": 622329856,
+  "output_head_weight_bits": 8,
   "routed_expert_groups": []
 }
 ```
@@ -172,6 +316,16 @@ parameter_flops_per_token = mac_flops * active_parameter_elements
 
 默认 `mac_flops=2`。
 
+`output_head_parameters` 是 `always_active_parameters` 中属于 LM head 的子集，
+不是额外参数。Decode 中二者仍都对每个输出位置执行；prefill 中 backbone
+对每个 executed input token 执行，而 LM head 默认只对每个请求的最后一个
+有效位置执行。使用 `--logits-mode all` 时，LM head 才对全部执行位置计算。
+非最终 chunk 使用 `--logits-mode none`，此时不执行也不读取完整 LM head；
+`output_head_weight_bits` 用于从 weight traffic 中拆出这部分权重。
+未填写该字段的旧配置仍可加载，但会把全部 always-active 参数视为 backbone；
+结果中的 `output_head_parameters_configured=false` 会标出这一回退。仓库自带的
+真实模型配置均已显式填写。
+
 ### 3.2 MoE routed experts
 
 ```json
@@ -189,18 +343,22 @@ parameter_flops_per_token = mac_flops * active_parameter_elements
 
 `parameters_per_expert` 表示单层中一个 expert 的参数量。Shared expert 必须计入 `always_active_parameters`，不能放在 routed group 中。
 
-默认采用均匀独立路由近似。Batch 内预计触达的 routed expert 并集为：
+默认采用均匀独立路由近似。一次调用中 `N` 个 routed positions 预计触达的
+expert 并集为：
 
 ```text
-E_unique(B) = E * [1 - (1 - k/E)^B]
+E_unique(N) = E * [1 - (1 - k/E)^N]
 ```
+
+Decode 的 `N` 是本 step 的请求数 `B`；varlen/packed prefill 的 `N` 是输入
+token 总数 `T`；当前 padded profile 使用实际 executed positions。
 
 可选路由模式：
 
 - `uniform_independent`：默认分析近似；
 - `same_experts`：所有请求选择相同专家，代表最佳复用边界；
 - `no_batch_reuse`：每个 token 的 expert 权重均重新读取，代表流量上界；
-- `explicit_unique`：从实测路由 trace 填写不同 batch 对应的专家并集。
+- `explicit_unique`：从实测路由 trace 填写 phase 对应的专家并集。
 
 实测配置示例：
 
@@ -209,8 +367,16 @@ E_unique(B) = E * [1 - (1 - k/E)^B]
 "expected_unique_experts_by_batch": {
   "1": 8,
   "32": 147.5
+},
+"expected_unique_experts_by_active_tokens": {
+  "128": 210.0,
+  "4096": 256.0
 }
 ```
+
+`expected_unique_experts_by_batch` 用于 decode；
+`expected_unique_experts_by_active_tokens` 用于 prefill。两种 axis 不会静默
+互相回退，避免同一个整数 key 被解释成不同含义。
 
 ### 3.3 Layer group
 
@@ -242,11 +408,16 @@ E_unique(B) = E * [1 - (1 - k/E)^B]
     {
       "kind": "fixed_cost",
       "work": {"other_read_bytes": 7168},
-      "cache": {}
+      "cache": {},
+      "prefill_scope": "per_token"
     }
   ]
 }
 ```
+
+`fixed_cost.prefill_scope` 可取 `per_token`（默认，prefill 中乘新输入 token
+数）或 `per_request`（每次请求调用只计一次）；decode 仍按每输出 token
+调用一次 mixer 的既有语义。
 
 ## 4. 支持的注意力表示
 
@@ -448,15 +619,22 @@ Mamba-2:
   "weight_hbm_fraction": 1.0,
   "kv_hbm_fraction": 1.0,
   "index_hbm_fraction": 1.0,
-  "state_hbm_fraction": 1.0
+  "state_hbm_fraction": 1.0,
+  "activation_bytes_per_input_token": 0,
+  "extra_flops_per_input_token": 0
 }
 ```
 
 `*_hbm_fraction` 只影响数据搬运，不影响逻辑缓存容量。当前版本不自动求解片上驻留分配；它只接受明确的部署假设。
 
+`activation_bytes_per_input_token` 与 `extra_flops_per_input_token` 是 prefill
+每个 executed input position 的显式附加项，默认均为 0；它们分别进入
+activation traffic 和 extra FLOPs。Decode 继续使用对应的
+`*_per_output_token` 字段。
+
 ## 8. 输出口径
 
-CLI 默认表格包含：
+Decode CLI 默认表格包含：
 
 - `GFLOP/token`；
 - `GB/token`；
@@ -466,6 +644,13 @@ CLI 默认表格包含：
 - 每请求缓存容量。
 
 JSON 输出还保留完整的 decode-step 总量、每 token 分项和每层预计读取的 expert 权重集合数。CSV 使用长表格式，适合直接绘制 batch=1 和 batch=32 的两组曲线。
+
+Prefill 输出同时保留一次调用的 `batch_work`、按有效输入 token 归一化的
+`per_input_work`、`valid/executed tokens`、`valid/executed causal pair slots`、
+padding 效率、最终有效 cache，以及 `batch_operand_work`。其中
+`batch_work.total_bytes` 是 compulsory/logical-HBM 口径；
+`batch_operand_work` 是不跨 query 复用的 pair-stream 对照，两者是替代视图，
+不能相加。
 
 ## 9. 验证
 
@@ -485,11 +670,20 @@ python3 -m unittest discover -s tests -v
 - 显式 recurrent state 的上下文无关性；
 - 线性注意力、SSM、Mamba-1、Mamba-2 的状态推导；
 - DeepSeek-V4-Pro 1M context 架构锚点和 shared-expert 精度；
-- continuous batching 的不同上下文求和。
+- continuous batching 的不同上下文求和；
+- prefill 的 Full/SWA/DSA、cached prefix、causal 对角项和 fused recurrent scan；
+- 固定 batch 扫长度、固定 token budget、ragged varlen/padded 三组实验；
+- LM head `last/all/none`、MoE active-token 专家并集，以及全部 27 个真实配置的
+  prefill 回归。
 
 ## 10. 当前边界
 
-- 只计算 decode，不计算 prefill；
+- Prefill 的默认 HBM 结果是架构级 compulsory/logical 流量，不声称等于某个
+  FlashAttention、tile 或融合 kernel 的实测流量；pair-stream operand 另列；
+- `padded` 当前描述普通 one-shot prefill；带 cached prefix 的 chunk/prefix-cache
+  分析使用 `varlen` 或 `packed`；
+- `logits-mode=none` 支持不产生 logits 的非最终 chunk；同一 batch 中只有部分
+  请求结束的任意 logit-position 子集尚未建模；
 - 默认忽略 softmax、RMSNorm、激活函数等小项，可通过配置加入；
 - SSM/Mamba 默认 recurrence 系数不把指数、softplus 和 gate 强行折算成普通 FLOPs，精确项目需通过可配置系数和额外 FLOPs 补充；
 - 不统计 tensor/expert parallel 的卡间通信；

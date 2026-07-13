@@ -187,11 +187,116 @@ class AccessStats:
     index_flops: float = 0.0
 
 
+@dataclass(frozen=True)
+class PrefillAccessStats:
+    """Aggregate access counts for one fused prefill invocation.
+
+    ``*_compulsory_*`` counts distinct entries from the cached prefix which
+    have to be brought into the invocation at least once.  Entries produced by
+    the same prefill invocation are assumed to remain available to its fused
+    attention kernel and are therefore writes, but not compulsory HBM reads.
+
+    ``*_operand_*`` expands every query-to-entry access.  It is the no-reuse
+    pair-stream traffic alternative, not a claim about a particular kernel's
+    measured HBM behavior.  Compute, writes, and final cache capacity are the
+    same under both traffic alternatives.
+    """
+
+    main_compulsory_read_entries: float
+    main_operand_read_entries: float
+    main_write_entries: float
+    main_stored_entries: float
+    index_compulsory_read_bytes: float = 0.0
+    index_operand_read_bytes: float = 0.0
+    index_write_bytes: float = 0.0
+    index_stored_bytes: float = 0.0
+    index_flops: float = 0.0
+
+
+def _validate_prefill_arguments(
+    cached_tokens: int,
+    new_tokens: int,
+    include_self_attention: bool,
+) -> None:
+    """Validate the common single-request prefill arguments."""
+
+    for name, value in (
+        ("cached_tokens", cached_tokens),
+        ("new_tokens", new_tokens),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{name} must be an integer")
+        if value < 0:
+            raise ValueError(f"{name} must be >= 0")
+    if not isinstance(include_self_attention, bool):
+        raise ValueError("include_self_attention must be true or false")
+
+
+def _effective_prefill_start(
+    cached_tokens: int, include_self_attention: bool
+) -> int:
+    """Context value evaluated for the first query in a prefill chunk."""
+
+    return cached_tokens + int(include_self_attention)
+
+
+def _sum_clamped_linear(start: int, count: int, cap: int) -> float:
+    """Return ``sum(min(start + i, cap), i=0..count-1)`` in O(1)."""
+
+    below_cap = min(count, max(cap - start, 0))
+    linear_sum = below_cap * (2 * start + below_cap - 1) / 2.0
+    return linear_sum + (count - below_cap) * cap
+
+
+def _floor_division_prefix(count: int, divisor: int) -> int:
+    """Return ``sum(floor(i/divisor), i=0..count-1)`` exactly."""
+
+    blocks, remainder = divmod(count, divisor)
+    return (
+        divisor * blocks * (blocks - 1) // 2
+        + blocks * remainder
+    )
+
+
+def _sum_floor_division(start: int, count: int, divisor: int) -> float:
+    """Return ``sum(floor((start+i)/divisor), i=0..count-1)``."""
+
+    return float(
+        _floor_division_prefix(start + count, divisor)
+        - _floor_division_prefix(start, divisor)
+    )
+
+
+def _sum_min_floor_division(
+    start: int, count: int, divisor: int, cap: int
+) -> float:
+    """Sum compressed candidate counts after applying a top-k cap."""
+
+    # floor(value / divisor) first reaches ``cap`` at cap * divisor.
+    below_cap = min(count, max(cap * divisor - start, 0))
+    return (
+        _sum_floor_division(start, below_cap, divisor)
+        + float((count - below_cap) * cap)
+    )
+
+
 class AccessPattern(ABC):
     @abstractmethod
     def evaluate(
         self, context_tokens: int, deployment: DeploymentConfig
     ) -> AccessStats:
+        raise NotImplementedError
+
+    @abstractmethod
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        """Aggregate one request's causal prefill accesses without looping."""
+
         raise NotImplementedError
 
 
@@ -207,6 +312,30 @@ class FullAccess(AccessPattern):
             main_stored_entries=float(context_tokens),
         )
 
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        start = _effective_prefill_start(
+            cached_tokens, include_self_attention
+        )
+        operand_entries = new_tokens * (2 * start + new_tokens - 1) / 2.0
+        return PrefillAccessStats(
+            main_compulsory_read_entries=(
+                float(cached_tokens) if new_tokens else 0.0
+            ),
+            main_operand_read_entries=operand_entries,
+            main_write_entries=float(new_tokens),
+            main_stored_entries=float(cached_tokens + new_tokens),
+        )
+
 
 @dataclass(frozen=True)
 class SlidingWindowAccess(AccessPattern):
@@ -218,6 +347,37 @@ class SlidingWindowAccess(AccessPattern):
         del deployment
         visible = float(min(context_tokens, self.window_tokens))
         return AccessStats(visible, 1.0, visible)
+
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        self_entries = int(include_self_attention)
+        start = cached_tokens + self_entries
+        # The first query exposes the only cached-prefix entries which can
+        # appear in this chunk.  Later windows slide toward newly produced KV.
+        compulsory_entries = min(
+            cached_tokens, max(self.window_tokens - self_entries, 0)
+        )
+        if not new_tokens:
+            compulsory_entries = 0
+        return PrefillAccessStats(
+            main_compulsory_read_entries=float(compulsory_entries),
+            main_operand_read_entries=_sum_clamped_linear(
+                start, new_tokens, self.window_tokens
+            ),
+            main_write_entries=float(new_tokens),
+            main_stored_entries=float(
+                min(cached_tokens + new_tokens, self.window_tokens)
+            ),
+        )
 
 
 @dataclass(frozen=True)
@@ -235,6 +395,34 @@ class CompressedFullAccess(AccessPattern):
             main_read_entries=complete_entries,
             main_write_entries=1.0 / self.compression_ratio,
             main_stored_entries=complete_entries,
+        )
+
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        ratio = self.compression_ratio
+        initial_entries = cached_tokens // ratio
+        final_entries = (cached_tokens + new_tokens) // ratio
+        start = _effective_prefill_start(
+            cached_tokens, include_self_attention
+        )
+        return PrefillAccessStats(
+            main_compulsory_read_entries=(
+                float(initial_entries) if new_tokens else 0.0
+            ),
+            main_operand_read_entries=_sum_floor_division(
+                start, new_tokens, ratio
+            ),
+            main_write_entries=float(final_entries - initial_entries),
+            main_stored_entries=float(final_entries),
         )
 
 
@@ -259,6 +447,37 @@ class FixedTopKAccess(AccessPattern):
             main_read_entries=min(float(self.top_k), candidates),
             main_write_entries=1.0 / self.compression_ratio,
             main_stored_entries=candidates,
+        )
+
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        ratio = self.compression_ratio
+        initial_entries = cached_tokens // ratio
+        final_entries = (cached_tokens + new_tokens) // ratio
+        start = _effective_prefill_start(
+            cached_tokens, include_self_attention
+        )
+        operand_entries = _sum_min_floor_division(
+            start, new_tokens, ratio, self.top_k
+        )
+        # Without a structural selection trace the overlap of Q top-k sets is
+        # unknowable.  This is a conservative distinct cached-entry union: it
+        # is bounded by both the prefix capacity and all selected slots.
+        compulsory_entries = min(float(initial_entries), operand_entries)
+        return PrefillAccessStats(
+            main_compulsory_read_entries=compulsory_entries,
+            main_operand_read_entries=operand_entries,
+            main_write_entries=float(final_entries - initial_entries),
+            main_stored_entries=float(final_entries),
         )
 
 
@@ -304,6 +523,83 @@ class LearnedTopKAccess(AccessPattern):
             index_flops=index_flops,
         )
 
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        ratio = self.compression_ratio
+        initial_entries = cached_tokens // ratio
+        final_entries = (cached_tokens + new_tokens) // ratio
+        start = _effective_prefill_start(
+            cached_tokens, include_self_attention
+        )
+        candidate_operand_entries = _sum_floor_division(
+            start, new_tokens, ratio
+        )
+        main_operand_entries = _sum_min_floor_division(
+            start, new_tokens, ratio, self.top_k
+        )
+        main_compulsory_entries = min(
+            float(initial_entries), main_operand_entries
+        )
+
+        entry_bits = self.index_bits or deployment.index_bits
+        entry_bytes = _bits_to_bytes(self.index_entry_elements, entry_bits)
+        score_flops = 2.0 * self.index_query_heads * self.index_head_dim
+
+        return PrefillAccessStats(
+            # The selected KV sets can vary across queries, so this is the same
+            # conservative distinct-prefix union used by FixedTopKAccess.
+            main_compulsory_read_entries=main_compulsory_entries,
+            main_operand_read_entries=main_operand_entries,
+            main_write_entries=float(final_entries - initial_entries),
+            main_stored_entries=float(final_entries),
+            # Every old index entry is scanned by at least the first query;
+            # new entries can stay within the fused invocation.
+            index_compulsory_read_bytes=(
+                initial_entries * entry_bytes if new_tokens else 0.0
+            ),
+            index_operand_read_bytes=(
+                candidate_operand_entries * entry_bytes
+            ),
+            index_write_bytes=(final_entries - initial_entries) * entry_bytes,
+            index_stored_bytes=final_entries * entry_bytes,
+            index_flops=candidate_operand_entries
+            * (score_flops + self.selection_flops_per_candidate),
+        )
+
+
+@dataclass(frozen=True)
+class PrefillMixerCost:
+    """Per-layer, per-request cost of one prefill chunk.
+
+    ``work`` is the compulsory/logical-HBM alternative: a fused invocation
+    reads each required cached-prefix entry once and does not reread entries it
+    produces itself.  ``operand_work`` is the pair-stream alternative where
+    attention and index reads are expanded across all queries.  Both contain
+    identical FLOPs and write traffic, so callers select one alternative; they
+    must never add the two together.  ``cache`` is capacity after all
+    ``new_tokens`` have been processed, rather than a sum of per-position
+    capacities.
+    """
+
+    work: WorkCost
+    operand_work: WorkCost
+    cache: CacheCapacity
+
+    def scaled(self, factor: float) -> "PrefillMixerCost":
+        return PrefillMixerCost(
+            work=self.work.scaled(factor),
+            operand_work=self.operand_work.scaled(factor),
+            cache=self.cache.scaled(factor),
+        )
+
 
 class SequenceMixer(ABC):
     """A non-parameterized sequence operation for one model layer."""
@@ -312,6 +608,18 @@ class SequenceMixer(ABC):
     def decode_cost(
         self, context_tokens: int, deployment: DeploymentConfig
     ) -> MixerCost:
+        raise NotImplementedError
+
+    @abstractmethod
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        """Return aggregate cost for one request's fused prefill chunk."""
+
         raise NotImplementedError
 
 
@@ -374,6 +682,74 @@ class SoftmaxAttentionMixer(SequenceMixer):
         )
         return MixerCost(work, cache)
 
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        stats = self.access.prefill_evaluate(
+            cached_tokens,
+            new_tokens,
+            deployment,
+            include_self_attention,
+        )
+        entry_bytes = self.layout.entry_bytes(deployment)
+
+        attention_flops = stats.main_operand_read_entries * (
+            self.layout.attention_flops_per_entry()
+            + self.layout.query_heads * self.softmax_flops_per_score
+        )
+        kv_write_bytes = 0.0
+        if deployment.include_kv_write:
+            kv_write_bytes = (
+                stats.main_write_entries
+                * entry_bytes
+                * deployment.kv_hbm_fraction
+            )
+        index_write_bytes = 0.0
+        if deployment.include_index_write:
+            index_write_bytes = (
+                stats.index_write_bytes * deployment.index_hbm_fraction
+            )
+
+        common = {
+            "attention_flops": attention_flops,
+            "index_flops": stats.index_flops,
+            "kv_write_bytes": kv_write_bytes,
+            "index_write_bytes": index_write_bytes,
+        }
+        compulsory_work = WorkCost(
+            **common,
+            kv_read_bytes=(
+                stats.main_compulsory_read_entries
+                * entry_bytes
+                * deployment.kv_hbm_fraction
+            ),
+            index_read_bytes=(
+                stats.index_compulsory_read_bytes
+                * deployment.index_hbm_fraction
+            ),
+        )
+        operand_work = WorkCost(
+            **common,
+            kv_read_bytes=(
+                stats.main_operand_read_entries
+                * entry_bytes
+                * deployment.kv_hbm_fraction
+            ),
+            index_read_bytes=(
+                stats.index_operand_read_bytes
+                * deployment.index_hbm_fraction
+            ),
+        )
+        cache = CacheCapacity(
+            kv_bytes=stats.main_stored_entries * entry_bytes,
+            index_bytes=stats.index_stored_bytes,
+        )
+        return PrefillMixerCost(compulsory_work, operand_work, cache)
+
 
 @dataclass(frozen=True)
 class RecurrentStateMixer(SequenceMixer):
@@ -427,6 +803,54 @@ class RecurrentStateMixer(SequenceMixer):
                 state_bytes=_bits_to_bytes(self.state_elements, bits)
             ),
         )
+
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        bits = self.state_bits or deployment.state_bits
+        read_fraction = (
+            deployment.state_hbm_fraction
+            if self.read_hbm_fraction is None
+            else self.read_hbm_fraction
+        )
+        write_fraction = (
+            deployment.state_hbm_fraction
+            if self.write_hbm_fraction is None
+            else self.write_hbm_fraction
+        )
+
+        # A fused scan consumes the prior persistent state once and materializes
+        # only its final state.  Intermediate recurrence values are not HBM
+        # traffic.  A fresh prompt starts from an implicit zero state.
+        read_bytes = 0.0
+        if cached_tokens and new_tokens:
+            read_bytes = _bits_to_bytes(
+                self.read_elements_per_token, bits
+            ) * read_fraction
+        write_bytes = 0.0
+        if new_tokens and deployment.include_state_write:
+            write_bytes = _bits_to_bytes(
+                self.write_elements_per_token, bits
+            ) * write_fraction
+        work = WorkCost(
+            state_flops=self.flops_per_token * new_tokens,
+            state_read_bytes=read_bytes,
+            state_write_bytes=write_bytes,
+        )
+        cache = CacheCapacity(
+            state_bytes=_bits_to_bytes(self.state_elements, bits)
+        )
+        # Operand expansion is meaningful for attention/index scans.  A
+        # recurrent prefill is explicitly modeled as one fused scan in both
+        # traffic alternatives.
+        return PrefillMixerCost(work, work, cache)
 
 
 @dataclass(frozen=True)
@@ -483,6 +907,40 @@ class LinearAttentionMixer(SequenceMixer):
             write_hbm_fraction=self.write_hbm_fraction,
         ).decode_cost(context_tokens, deployment)
 
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        matrix_elements = self.q_heads * self.key_dim * self.value_dim
+        normalizer_elements = (
+            self.q_heads * self.key_dim if self.normalizer_state else 0
+        )
+        state_elements = matrix_elements + normalizer_elements
+
+        state_flops = 4.0 * matrix_elements
+        if self.normalizer_state:
+            state_flops += 3.0 * normalizer_elements
+            state_flops += self.q_heads * self.value_dim
+        state_flops += self.extra_flops_per_token
+
+        return RecurrentStateMixer(
+            state_elements=state_elements,
+            read_elements_per_token=state_elements,
+            write_elements_per_token=state_elements,
+            flops_per_token=state_flops,
+            state_bits=self.state_bits,
+            read_hbm_fraction=self.read_hbm_fraction,
+            write_hbm_fraction=self.write_hbm_fraction,
+        ).prefill_cost(
+            cached_tokens,
+            new_tokens,
+            deployment,
+            include_self_attention,
+        )
+
 
 @dataclass(frozen=True)
 class DiagonalSSMMixer(SequenceMixer):
@@ -527,6 +985,36 @@ class DiagonalSSMMixer(SequenceMixer):
             read_hbm_fraction=self.read_hbm_fraction,
             write_hbm_fraction=self.write_hbm_fraction,
         ).decode_cost(context_tokens, deployment)
+
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        recurrent_elements = self.channels * self.state_dim
+        state_elements = self.channels * (
+            self.state_dim + self.conv_state_length
+        )
+        state_flops = (
+            recurrent_elements * self.recurrence_flops_per_state_element
+            + self.extra_flops_per_token
+        )
+        return RecurrentStateMixer(
+            state_elements=state_elements,
+            read_elements_per_token=state_elements,
+            write_elements_per_token=state_elements,
+            flops_per_token=state_flops,
+            state_bits=self.state_bits,
+            read_hbm_fraction=self.read_hbm_fraction,
+            write_hbm_fraction=self.write_hbm_fraction,
+        ).prefill_cost(
+            cached_tokens,
+            new_tokens,
+            deployment,
+            include_self_attention,
+        )
 
 
 @dataclass(frozen=True)
@@ -590,6 +1078,47 @@ class MambaStateMixer(SequenceMixer):
             write_hbm_fraction=self.write_hbm_fraction,
         ).decode_cost(context_tokens, deployment)
 
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        if self.variant == "mamba1":
+            recurrence_width = self.inner_dim
+            conv_channels = self.inner_dim
+        elif self.variant == "mamba2":
+            recurrence_width = self.ssm_dim or self.inner_dim
+            conv_channels = (
+                recurrence_width + 2 * self.groups * self.state_dim
+            )
+        else:
+            raise ValueError(f"unsupported Mamba variant {self.variant!r}")
+
+        recurrent_elements = recurrence_width * self.state_dim
+        state_elements = (
+            recurrent_elements + conv_channels * self.conv_kernel
+        )
+        state_flops = (
+            recurrent_elements * self.recurrence_flops_per_state_element
+            + self.extra_flops_per_token
+        )
+        return RecurrentStateMixer(
+            state_elements=state_elements,
+            read_elements_per_token=state_elements,
+            write_elements_per_token=state_elements,
+            flops_per_token=state_flops,
+            state_bits=self.state_bits,
+            read_hbm_fraction=self.read_hbm_fraction,
+            write_hbm_fraction=self.write_hbm_fraction,
+        ).prefill_cost(
+            cached_tokens,
+            new_tokens,
+            deployment,
+            include_self_attention,
+        )
+
 
 @dataclass(frozen=True)
 class FixedCostMixer(SequenceMixer):
@@ -597,12 +1126,38 @@ class FixedCostMixer(SequenceMixer):
 
     work: WorkCost
     cache: CacheCapacity
+    prefill_scope: str = "per_token"
+
+    def __post_init__(self) -> None:
+        if self.prefill_scope not in {"per_token", "per_request"}:
+            raise ValueError(
+                "prefill_scope must be 'per_token' or 'per_request'"
+            )
 
     def decode_cost(
         self, context_tokens: int, deployment: DeploymentConfig
     ) -> MixerCost:
         del context_tokens, deployment
         return MixerCost(self.work, self.cache)
+
+    def prefill_cost(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillMixerCost:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        factor = (
+            float(new_tokens)
+            if self.prefill_scope == "per_token"
+            else float(bool(new_tokens))
+        )
+        work = self.work.scaled(factor)
+        return PrefillMixerCost(work, work, self.cache)
 
 
 def _int_positive(config: Mapping[str, Any], key: str, path: str) -> int:
@@ -993,8 +1548,17 @@ def build_mixer(config: Mapping[str, Any], path: str) -> SequenceMixer:
             raise ValueError(f"{path}.work must be an object")
         if not isinstance(cache_config, Mapping):
             raise ValueError(f"{path}.cache must be an object")
+        prefill_scope = config.get("prefill_scope", "per_token")
+        if not isinstance(prefill_scope, str) or prefill_scope not in {
+            "per_token",
+            "per_request",
+        }:
+            raise ValueError(
+                f"{path}.prefill_scope must be 'per_token' or 'per_request'"
+            )
         return FixedCostMixer(
             work=_explicit_work(work_config, f"{path}.work"),
             cache=_explicit_cache(cache_config, f"{path}.cache"),
+            prefill_scope=prefill_scope,
         )
     raise ValueError(f"{path}.kind has unsupported mixer {kind!r}")

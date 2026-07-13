@@ -162,32 +162,49 @@ def _parse_deployment(config: Mapping[str, Any]) -> DeploymentConfig:
         extra_flops_per_output_token=_nonnegative(
             config, "extra_flops_per_output_token", path, default=0.0
         ),
+        activation_bytes_per_input_token=_nonnegative(
+            config,
+            "activation_bytes_per_input_token",
+            path,
+            default=0.0,
+        ),
+        extra_flops_per_input_token=_nonnegative(
+            config, "extra_flops_per_input_token", path, default=0.0
+        ),
     )
 
 
 def _parse_explicit_unique(
-    config: Mapping[str, Any], path: str, expert_count: int
+    config: Mapping[str, Any],
+    path: str,
+    expert_count: int,
+    selected_per_token: int,
+    key: str,
 ) -> dict[int, float]:
-    raw = config.get("expected_unique_experts_by_batch", {})
-    raw_mapping = _mapping(raw, f"{path}.expected_unique_experts_by_batch")
+    raw = config.get(key, {})
+    raw_mapping = _mapping(raw, f"{path}.{key}")
     result: dict[int, float] = {}
     for raw_batch, raw_value in raw_mapping.items():
         try:
             batch = int(raw_batch)
         except (TypeError, ValueError) as exc:
             raise ConfigurationError(
-                f"{path}.expected_unique_experts_by_batch keys must be batches"
+                f"{path}.{key} keys must be positive integer counts"
             ) from exc
         if batch <= 0 or isinstance(raw_value, bool) or not isinstance(
             raw_value, (int, float)
         ):
             raise ConfigurationError(
-                f"{path}.expected_unique_experts_by_batch has invalid entry"
+                f"{path}.{key} has invalid entry"
             )
         value = float(raw_value)
-        if not 0 < value <= expert_count:
+        lower = float(selected_per_token)
+        upper = float(min(expert_count, batch * selected_per_token))
+        if not lower <= value <= upper:
             raise ConfigurationError(
-                f"{path}.expected unique experts must be in (0, expert_count]"
+                f"{path}.{key}[{batch}] must be between selected_per_token="
+                f"{selected_per_token} and min(expert_count, count * "
+                f"selected_per_token)={upper:g}"
             )
         result[batch] = value
     return result
@@ -215,10 +232,24 @@ def _parse_expert_group(
         raise ConfigurationError(
             f"{path}.routing_mode must be one of {sorted(supported)}"
         )
-    explicit = _parse_explicit_unique(config, path, expert_count)
-    if mode == "explicit_unique" and not explicit:
+    explicit_batches = _parse_explicit_unique(
+        config,
+        path,
+        expert_count,
+        selected,
+        "expected_unique_experts_by_batch",
+    )
+    explicit_tokens = _parse_explicit_unique(
+        config,
+        path,
+        expert_count,
+        selected,
+        "expected_unique_experts_by_active_tokens",
+    )
+    if mode == "explicit_unique" and not (explicit_batches or explicit_tokens):
         raise ConfigurationError(
-            f"{path} requires expected_unique_experts_by_batch"
+            f"{path} requires expected_unique_experts_by_batch and/or "
+            "expected_unique_experts_by_active_tokens"
         )
 
     return RoutedExpertGroup(
@@ -230,7 +261,8 @@ def _parse_expert_group(
             config, "parameters_per_expert", path
         ),
         routing_mode=str(mode),
-        expected_unique_experts_by_batch=explicit,
+        expected_unique_experts_by_batch=explicit_batches,
+        expected_unique_experts_by_active_tokens=explicit_tokens,
         weight_bits=_optional_bits(config, "weight_bits", path),
     )
 
@@ -286,11 +318,26 @@ def _parse_weights(config: Mapping[str, Any]) -> WeightConfig:
             )
         always_groups = tuple(parsed_always)
 
-    return WeightConfig(
+    result = WeightConfig(
         always_active_parameter_groups=always_groups,
         routed_expert_groups=groups,
         weight_bits=_optional_bits(config, "weight_bits", path),
+        output_head_parameters=_nonnegative(
+            config, "output_head_parameters", path, default=0.0
+        ),
+        output_head_parameters_configured=(
+            "output_head_parameters" in config
+        ),
+        output_head_weight_bits=_optional_bits(
+            config, "output_head_weight_bits", path
+        ),
     )
+    if result.output_head_parameters > result.always_active_parameters:
+        raise ConfigurationError(
+            f"{path}.output_head_parameters cannot exceed the "
+            "always-active parameter total"
+        )
+    return result
 
 
 def _parse_layer_group(
@@ -359,6 +406,18 @@ def _int_list(value: Any, path: str, *, positive: bool) -> tuple[int, ...]:
     return tuple(result)
 
 
+def _nested_positive_int_lists(
+    value: Any, path: str
+) -> tuple[tuple[int, ...], ...]:
+    result: list[tuple[int, ...]] = []
+    for index, item in enumerate(_sequence(value, path)):
+        batch = _int_list(item, f"{path}[{index}]", positive=True)
+        if not batch:
+            raise ConfigurationError(f"{path}[{index}] cannot be empty")
+        result.append(batch)
+    return tuple(result)
+
+
 def parse_engine_config(raw: Mapping[str, Any]) -> EngineConfig:
     """Validate a decoded JSON object and return normalized typed config."""
 
@@ -368,6 +427,7 @@ def parse_engine_config(raw: Mapping[str, Any]) -> EngineConfig:
         raise ConfigurationError("schema_version must be 1")
 
     analysis = _mapping(config.get("analysis", {}), "analysis")
+    prefill = _mapping(analysis.get("prefill", {}), "analysis.prefill")
     return EngineConfig(
         schema_version=1,
         model=_parse_model(_mapping(config.get("model"), "model")),
@@ -379,6 +439,25 @@ def parse_engine_config(raw: Mapping[str, Any]) -> EngineConfig:
         ),
         default_batches=_int_list(
             analysis.get("batches", []), "analysis.batches", positive=True
+        ),
+        default_prefill_lengths=_int_list(
+            prefill.get("prompt_lengths", []),
+            "analysis.prefill.prompt_lengths",
+            positive=True,
+        ),
+        default_prefill_batches=_int_list(
+            prefill.get("batches", []),
+            "analysis.prefill.batches",
+            positive=True,
+        ),
+        default_prefill_token_budgets=_int_list(
+            prefill.get("token_budgets", []),
+            "analysis.prefill.token_budgets",
+            positive=True,
+        ),
+        default_ragged_prefill_batches=_nested_positive_int_lists(
+            prefill.get("ragged_batches", []),
+            "analysis.prefill.ragged_batches",
         ),
     )
 

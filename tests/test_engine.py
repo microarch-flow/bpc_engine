@@ -546,30 +546,31 @@ class DecodeEngineTests(unittest.TestCase):
 
     def test_v4_official_one_million_context_anchor(self):
         root = Path(__file__).resolve().parents[1]
-        config = load_engine_config(root / "configs" / "deepseek_v4_pro.json")
+        config = load_engine_config(
+            root / "configs" / "16bit" / "deepseek_v4_pro_16bit.json"
+        )
         result = calculate_decode(
             config.model, config.deployment, [1_048_576]
         )
 
-        # The official report's Figure 1 is approximately 0.3 TFLOP/token and
-        # 5 GB KV cache.  These exact values also provide a regression anchor
-        # for the decomposed CSA/HCA formulas in this implementation.
+        # The arithmetic remains the report's approximately 0.3 TFLOP/token.
+        # Cache/traffic reflect this repository's uniform 16-bit sweep profile.
         self.assertEqual(result.per_output_work.total_flops, 303_219_179_520)
         self.assertAlmostEqual(
             result.cache_capacity_total.total_bytes,
-            5_183_938_560,
+            8_824_422_400,
         )
         self.assertAlmostEqual(
             result.per_output_work.total_bytes,
-            37_684_140_171.5,
+            98_501_184_728,
         )
 
         shared = next(
             group
             for group in config.model.weights.always_active_parameter_groups
-            if group.name == "fp8_shared_experts"
+            if group.name == "16bit_shared_experts"
         )
-        self.assertEqual(shared.weight_bits, 8)
+        self.assertEqual(shared.weight_bits, 16)
 
     def test_all_shipped_model_configs_load_and_execute(self):
         """Every checked-in config must remain executable at its largest grid point."""
@@ -676,19 +677,21 @@ class DecodeEngineTests(unittest.TestCase):
         """Lock the audited matrix-parameter decompositions in model metadata."""
 
         expected = {
-            "glm_5_2_dsa_bf16.json": 40_297_758_720,
-            "qwen3_235b_a22b_bf16.json": 21_567_635_456,
-            "llama_3_3_70b_bf16.json": 69_501_714_432,
-            "qwen3_8b_bf16.json": 7_568_097_280,
-            "qwen3_4b_bf16.json": 4_022_272_000,
-            "qwen3_next_80b_a3b_bf16.json": 3_563_552_768,
-            "mamba_2_8b_bf16.json": 2_767_523_840,
+            "glm_5_2_dsa_16bit.json": 40_297_758_720,
+            "qwen3_235b_a22b_16bit.json": 21_567_635_456,
+            "llama_3_3_70b_16bit.json": 69_501_714_432,
+            "qwen3_8b_16bit.json": 7_568_097_280,
+            "qwen3_4b_16bit.json": 4_022_272_000,
+            "qwen3_next_80b_a3b_16bit.json": 3_563_552_768,
+            "mamba_2_8b_16bit.json": 2_767_523_840,
         }
         root = Path(__file__).resolve().parents[1]
 
         for filename, expected_active in expected.items():
             with self.subTest(config=filename):
-                config = load_engine_config(root / "configs" / filename)
+                config = load_engine_config(
+                    root / "configs" / "16bit" / filename
+                )
                 weights = config.model.weights
                 active = weights.always_active_parameters + sum(
                     group.layers
@@ -705,9 +708,11 @@ class DecodeEngineTests(unittest.TestCase):
     def test_new_sparse_and_recurrent_config_state_anchors(self):
         root = Path(__file__).resolve().parents[1]
 
-        glm = load_engine_config(root / "configs" / "glm_5_2_dsa_bf16.json")
+        glm = load_engine_config(
+            root / "configs" / "16bit" / "glm_5_2_dsa_16bit.json"
+        )
         glm_result = calculate_decode(glm.model, glm.deployment, [4096])
-        # IndexShare stores/scans one 128-element BF16 index key on only
+        # IndexShare stores/scans one 128-element 16-bit index key on only
         # 21 of the 78 layers; the other 57 layers reuse selected indices.
         expected_glm_index_bytes = 21 * 4096 * 128 * 2
         self.assertEqual(
@@ -720,7 +725,10 @@ class DecodeEngineTests(unittest.TestCase):
         )
 
         qwen_next = load_engine_config(
-            root / "configs" / "qwen3_next_80b_a3b_bf16.json"
+            root
+            / "configs"
+            / "16bit"
+            / "qwen3_next_80b_a3b_16bit.json"
         )
         qwen_next_result = calculate_decode(
             qwen_next.model, qwen_next.deployment, [4096]
@@ -730,7 +738,9 @@ class DecodeEngineTests(unittest.TestCase):
             36 * (524_288 + 32_768) * 2,
         )
 
-        mamba = load_engine_config(root / "configs" / "mamba_2_8b_bf16.json")
+        mamba = load_engine_config(
+            root / "configs" / "16bit" / "mamba_2_8b_16bit.json"
+        )
         short = calculate_decode(mamba.model, mamba.deployment, [128])
         long = calculate_decode(mamba.model, mamba.deployment, [1_048_576])
         self.assertEqual(short.per_output_work, long.per_output_work)

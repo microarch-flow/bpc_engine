@@ -17,7 +17,9 @@
         }
       ],
       "routed_expert_groups": [],
-      "weight_bits": 4
+      "weight_bits": 4,
+      "output_head_parameters": 128716800,
+      "output_head_weight_bits": 4
     },
     "layer_groups": [
       {

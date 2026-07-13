@@ -106,6 +106,8 @@ def _retag_name(name: str, bits: int) -> str:
 
 def _set_weight_precision(weights: dict[str, Any], bits: int) -> None:
     weights["weight_bits"] = bits
+    if "output_head_parameters" in weights:
+        weights["output_head_weight_bits"] = bits
     for group in weights.get("always_active_parameter_groups", []):
         group["weight_bits"] = bits
         group["name"] = _retag_name(group["name"], bits)
