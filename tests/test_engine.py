@@ -79,6 +79,46 @@ def full_gqa_group(layers: int = 32) -> list[dict]:
 
 
 class DecodeEngineTests(unittest.TestCase):
+    def test_logical_hbm_excludes_activation_without_changing_total_bytes(self):
+        config = engine_config(
+            always_active_parameters=10,
+            deployment={"activation_bytes_per_output_token": 7},
+            layer_groups=[
+                {
+                    "name": "other read",
+                    "layers": 1,
+                    "mixers": [
+                        {
+                            "kind": "fixed_cost",
+                            "work": {"other_read_bytes": 3},
+                            "cache": {},
+                        }
+                    ],
+                }
+            ],
+        )
+        result = calculate_decode(config.model, config.deployment, [1])
+
+        self.assertEqual(result.per_output_work.total_bytes, 20)
+        self.assertEqual(result.per_output_work.activation_bytes, 7)
+        self.assertEqual(result.per_output_work.logical_hbm_bytes, 13)
+        self.assertEqual(result.logical_hbm_bytes_per_flop, 13 / 20)
+
+    def test_decode_extrapolation_requires_explicit_opt_in(self):
+        config = engine_config(always_active_parameters=10)
+        context = config.model.max_context_tokens + 1
+
+        with self.assertRaises(ValueError):
+            calculate_decode(config.model, config.deployment, [context])
+
+        result = calculate_decode(
+            config.model,
+            config.deployment,
+            [context],
+            allow_extrapolation=True,
+        )
+        self.assertEqual(result.context_tokens, (context,))
+
     def test_gqa_matches_document_golden_example(self):
         config = engine_config(
             always_active_parameters=8_000_000_000,

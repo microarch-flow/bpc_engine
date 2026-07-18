@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "BLOOM 176B native BF16 weight+KV deployment",
+    "max_context_tokens": 2048,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_mha_projections",
+          "parameters": 57545850880,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_gelu_ffn",
+          "parameters": 115091701760,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_tied_lm_head",
+          "parameters": 3596615680,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16,
+      "output_head_parameters": 3596615680,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "70 full-context MHA layers",
+        "layers": 70,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mha",
+              "query_heads": 112,
+              "kv_heads": 112,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 28672
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "mainstream_deployment",
+      "release_date": "2022-07-12",
+      "checkpoint": "bigscience/bloom",
+      "architecture_summary": "Dense GPT-style decoder-only Transformer with GeLU FFN, full-context MHA, ALiBi positional bias, embedding LayerNorm, and tied input/output embeddings.",
+      "sources": {
+        "release": "https://huggingface.co/blog/bloom",
+        "model_card": "https://huggingface.co/bigscience/bloom",
+        "checkpoint_config": "https://huggingface.co/bigscience/bloom/blob/main/config.json",
+        "paper": "https://arxiv.org/abs/2211.05100",
+        "inference_profile": "https://huggingface.co/blog/bloom-inference-pytorch-scripts"
+      },
+      "architecture": {
+        "hidden_size": 14336,
+        "intermediate_size": 57344,
+        "layers": 70,
+        "query_heads": 112,
+        "kv_heads": 112,
+        "head_dim": 128,
+        "tokenizer_vocab_size": 250680,
+        "padded_embedding_rows": 250880,
+        "activation": "GeLU",
+        "position_encoding": "ALiBi",
+        "embedding_layernorm": true,
+        "attention_softmax_dtype": "float32",
+        "tie_word_embeddings": true,
+        "dense_model": true
+      },
+      "official_total_parameters": 176247271424,
+      "parameter_breakdown": {
+        "attention_projections": 57545850880,
+        "dense_gelu_ffn": 115091701760,
+        "tied_lm_head": 3596615680,
+        "engine_matrix_parameters": 176234168320,
+        "excluded_bias_and_norm_parameters": 13103104
+      },
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. The padded 250880-row shared embedding matrix is counted once as the full LM head, and input lookup is represented by one BF16 row read. Biases, LayerNorm parameters, GeLU, ALiBi score additions, FP32 softmax, and logits materialization are excluded from engine matrix FLOPs.",
+      "precision_profile": {
+        "profile": "native_2022_checkpoint_and_bf16_inference",
+        "weight_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "kv_precision_evidence": "The reference implementation stores projected key/value tensors directly as the cache without a separate cast, so native BF16 execution yields a BF16 KV cache.",
+        "quantization_metadata_included": false
+      },
+      "context_note": "2048 is the published training sequence length. ALiBi permits extrapolation experiments, but lengths above 2048 are not treated as the native validated context in this profile.",
+      "vocab_note": "The tokenizer has 250680 tokens; the checkpoint pads the embedding table to 250880 rows, which is the value used for parameter and LM-head calculations."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

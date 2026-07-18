@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "PaLM 540B 2022 low-latency INT8-weight BF16-KV deployment",
+    "max_context_tokens": 2048,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "int8_mqa_projections",
+          "parameters": 54565797888,
+          "weight_bits": 8
+        },
+        {
+          "name": "int8_swiglu_ffn",
+          "parameters": 481069891584,
+          "weight_bits": 8
+        },
+        {
+          "name": "int8_tied_lm_head",
+          "parameters": 4718592000,
+          "weight_bits": 8
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 8,
+      "output_head_parameters": 4718592000,
+      "output_head_weight_bits": 8
+    },
+    "layer_groups": [
+      {
+        "name": "118 full-context MQA layers",
+        "layers": 118,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mqa",
+              "query_heads": 48,
+              "kv_heads": 1,
+              "head_dim": 256,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 18432
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "flagship_resource_demand",
+      "release_date": "2022-04-05",
+      "architecture_summary": "Dense decoder-only Transformer with parallel attention/FFN blocks, SwiGLU, full-context MQA, RoPE, and tied input/output embeddings.",
+      "sources": {
+        "architecture_paper": "https://arxiv.org/abs/2204.02311",
+        "inference_paper": "https://arxiv.org/abs/2211.05102"
+      },
+      "architecture": {
+        "hidden_size": 18432,
+        "intermediate_size": 73728,
+        "layers": 118,
+        "query_heads": 48,
+        "kv_heads": 1,
+        "head_dim": 256,
+        "query_projection_width": 12288,
+        "vocab_size": 256000,
+        "activation": "SwiGLU",
+        "position_encoding": "RoPE",
+        "parallel_attention_ffn": true,
+        "tie_word_embeddings": true,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 540.35,
+        "unit": "billion_parameters",
+        "precision": "rounded_as_reported"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 54565797888,
+        "dense_swiglu_ffn": 481069891584,
+        "tied_lm_head": 4718592000,
+        "engine_matrix_parameters": 540354281472
+      },
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. The shared embedding matrix is counted once as the full LM head, and input lookup is represented by one INT8 row read. LayerNorm scales, elementwise activations, softmax, RoPE, logits materialization, and implementation padding are excluded.",
+      "precision_profile": {
+        "profile": "official_2022_low_latency_inference_implementation",
+        "weight_dtype": "int8",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 8,
+        "kv_bits": 16,
+        "activation_quantization": false,
+        "kv_precision_evidence": "The inference paper quantizes weights only, states that activation quantization was not implemented, and uses BF16 arithmetic; KV is therefore modeled as 16-bit BF16 activation state.",
+        "quantization_metadata_included": false
+      },
+      "context_note": "2048 is the published training length and the validated context used by the official inference study; longer memory-fit estimates are not treated as validated model context.",
+      "implementation_note": "The official 64-plus-TPU inference layout pads 48 query heads to 64 and adds physical padding parameters. This system-layout overhead is excluded from the logical model workload."
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

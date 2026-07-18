@@ -12,6 +12,46 @@ decode 与 prefill 阶段的工作量：
 
 项目只依赖 Python 标准库，建议使用 Python 3.10 或更高版本。
 
+## 文档导航
+
+- [Decode 趋势指标定义](docs/decode_trend_metrics.md)：`C/B`、FLOPs、logical-HBM
+  流量和容量的统一计算边界。
+- [Decode 趋势推进待办](docs/decode_trend_research_todo.md)：从样本整理到芯片指标换算的
+  P0–P9 路线。
+- [代表模型样本清单](docs/decode_trend_sample_manifest.md)：2022–2026YTD 的20个模型及
+  选择理由。
+- [字段数据字典](docs/decode_trend_data_dictionary.md)：配置、模型事实、P3审计和结果
+  CSV/JSONL 的字段、单位与公式。
+- [P3 机制支持审计](docs/decode_trend_p3_mechanism_audit.md)：逐模型、逐机制的
+  FLOPs、Traffic、Cache和Weight Capacity支持状态。
+- [字段能力矩阵](docs/decode_trend_field_capability_matrix.md)：目标字段由引擎、配置还是
+  研究事实产生。
+- [Prefill 指标规范](docs/prefill_metrics.md)：Prefill工作量、ragged/padded和两种流量
+  视图。
+- [Decode趋势数据生成](studies/decode_trend/releases/README.md)：从20个模型配置生成
+  完整CSV/JSONL和可复算版本目录。
+
+## 项目目录
+
+```text
+bpc_engine/
+├── decode_engine/              # 配置解析、机制公式、Decode/Prefill计算引擎
+├── configs/
+│   ├── 2022/ ... 2026/         # 趋势研究模型的历史实际部署配置
+│   └── 4bit/ 8bit/ 16bit/      # 统一精度对照配置
+├── docs/                       # 指标合同、数据字典、研究计划和审计文档
+├── examples/                   # MHA/GQA/MLA/SSM等机制配置示例
+├── scripts/                    # 批量计算、正式数据冻结和绘图脚本
+├── studies/decode_trend/       # 模型事实、P3审计及可复现数据生成入口
+├── tests/                      # 单元测试与机制数值锚点
+└── outputs/                    # 已跟踪基准输出；临时实验请写入/tmp
+```
+
+首次使用建议先阅读[字段数据字典](docs/decode_trend_data_dictionary.md)和
+[Decode 趋势指标定义](docs/decode_trend_metrics.md)，再从
+`configs/<year>/`选择模型配置。需要完整20模型研究数据时，按
+[Decode趋势数据生成说明](studies/decode_trend/releases/README.md)执行。
+
 ## 1. 最重要的计算口径
 
 引擎先计算完整的 decode step，再除以本 step 产生的 token 数：
@@ -69,7 +109,7 @@ python3 -m decode_engine \
 
 每个真实模型配置的 `metadata` 都保存了官方来源、原始结构字段、活跃参数拆分以及未计入项。JSON 不支持注释，因此这些元数据就是配置的可审计说明，不参与引擎公式。
 
-`examples/mechanism_catalog.json` 集中展示 MHA、MQA、GQA、MLA、SWA、DSA、CSA、HCA、线性注意力、SSM、Mamba-1 和 Mamba-2 的配置语法。它只是机制目录，不是一个真实 checkpoint。
+`examples/mechanism_catalog.json` 集中展示 MHA、MQA、GQA、MLA、SWA、固定分块注意力、DSA、CSA、HCA、线性注意力、SSM、Mamba-1 和 Mamba-2 的配置语法。它只是机制目录，不是一个真实 checkpoint。
 
 如果不传 `--contexts` 和 `--batches`，CLI 使用配置文件中 `analysis` 下的默认值。
 
@@ -486,9 +526,12 @@ GQA/MQA 只降低 KV 容量和搬运量，不降低按 Query head 执行的 QK/A
 |---|---|---:|---:|---:|
 | Full | `full` | `C` | `C` | 无 |
 | SWA | `swa` / `sliding_window` | `min(C,W)` | `min(C,W)` | 无 |
+| 固定分块 | `chunked_block` / `block_local` | `C mod W` | `C` 或 `C mod W` | 无 |
 | DSA | `dsa` | `min(k,C)` | `C` | 扫描 `C` 个 index entry |
 | CSA | `csa` | `min(k,floor(C/m))` | `floor(C/m)` | 扫描 `floor(C/m)` 个 index entry |
 | HCA | `hca` | `floor(C/m)` | `floor(C/m)` | 无 |
+
+固定分块注意力使用不重叠的 `chunk_tokens=W` 块，不能用 SWA 近似。`retain_full_history=true` 表示运行时虽然只读取当前块，却仍保存全部历史 KV；这是默认的保守部署边界。只有确认运行时会淘汰完成的块时，才能设为 `false`，此时容量为 `C mod W`。由于读取量在块边界归零，趋势扫描应同时包含边界点和边界前一点。
 
 DSA/CSA 会自动同时计算主 KV 路径和 indexer 路径，不能再对总流量简单乘一个稀疏率。示例 CSA 分支：
 
@@ -666,7 +709,7 @@ python3 -m unittest discover -s tests -v
 - Dense batch 权重摊薄；
 - MoE batch 专家并集；
 - MHA、MQA、GQA、MLA 命名布局及扫描公式；
-- SWA、DSA、CSA、HCA 的读取、存储与 indexer 双路径；
+- SWA、固定分块、DSA、CSA、HCA 的读取、存储与 indexer 双路径；
 - 显式 recurrent state 的上下文无关性；
 - 线性注意力、SSM、Mamba-1、Mamba-2 的状态推导；
 - DeepSeek-V4-Pro 1M context 架构锚点和 shared-expert 精度；

@@ -1,3 +1,6 @@
 __pycache__/
 .pytest_cache/
 *.py[cod]
+
+# Reproducible Decode trend datasets; generate with the documented script.
+/studies/decode_trend/releases/*/

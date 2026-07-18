@@ -35,8 +35,13 @@ def _flat_decode_result(result: DecodeResult) -> dict[str, Any]:
         "context_tokens": contexts[0] if same_context else result.average_context_tokens,
         "flops_per_token": work.total_flops,
         "bytes_per_token": work.total_bytes,
+        "logical_hbm_bytes_per_token": work.logical_hbm_bytes,
         "bytes_per_flop": result.bytes_per_flop,
         "tbps_per_pflops": result.tbps_per_pflops,
+        "logical_hbm_bytes_per_flop": result.logical_hbm_bytes_per_flop,
+        "logical_hbm_tbps_per_pflops": (
+            result.logical_hbm_tbps_per_pflops
+        ),
         "parameter_flops": work.parameter_flops,
         "attention_flops": work.attention_flops,
         "index_flops": work.index_flops,
@@ -336,6 +341,14 @@ def _parser() -> argparse.ArgumentParser:
         help="Context lengths. Defaults to analysis.contexts in the config.",
     )
     parser.add_argument(
+        "--allow-extrapolation",
+        action="store_true",
+        help=(
+            "Permit Decode contexts above the model's configured maximum. "
+            "The caller must treat those results as theoretical extrapolations."
+        ),
+    )
+    parser.add_argument(
         "--batches",
         nargs="+",
         type=int,
@@ -479,10 +492,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         config = load_engine_config(args.config)
         if args.phase == "prefill":
-            if args.contexts:
+            if args.contexts or args.allow_extrapolation:
                 raise ValueError(
-                    "--contexts is decode-only; use --prompt-lengths or "
-                    "--ragged-lengths for prefill"
+                    "--contexts and --allow-extrapolation are decode-only; "
+                    "use --prompt-lengths or --ragged-lengths for prefill"
                 )
             results: list[Result] = _calculate_prefill_results(config, args)
         else:
@@ -499,7 +512,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise ValueError(
                     "prefill experiment/layout options require --phase prefill"
                 )
-            results = calculate_grid(config, args.contexts, args.batches)
+            results = calculate_grid(
+                config,
+                args.contexts,
+                args.batches,
+                allow_extrapolation=args.allow_extrapolation,
+            )
     except (ConfigurationError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

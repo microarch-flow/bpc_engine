@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Kimi-K2.6 native routed-expert INT4 language decode + BF16 MLA-KV deployment",
+    "max_context_tokens": 262144,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_mla_projections",
+          "parameters": 6168444928,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_dense_layer0_swiglu",
+          "parameters": 396361728,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_shared_swiglu_experts",
+          "parameters": 2642411520,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 165150720,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 1174405120,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "int4_routed_swiglu_experts",
+          "layers": 60,
+          "expert_count": 384,
+          "selected_per_token": 8,
+          "parameters_per_expert": 44040192,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 4
+        }
+      ],
+      "weight_bits": 16,
+      "output_head_parameters": 1174405120,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "61 full-context MLA layers",
+        "layers": 61,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 16,
+              "rope_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 14336
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "flagship_resource_demand",
+      "release_date": "2026-04-14",
+      "checkpoint": "moonshotai/Kimi-K2.6",
+      "checkpoint_upload_revision": "e0ee936b6220f8a475e3d00f03ea7fcdde58c360",
+      "checkpoint_revision": "7eb5002f6aadc958aed6a9177b7ed26bb94011bb",
+      "checkpoint_revision_note": "The selected revision is the current 2026-05-19 YTD snapshot. It keeps the uploaded checkpoint and adds model-card/eval updates. The first large-file checkpoint upload was 2026-04-14.",
+      "architecture_summary": "Multimodal Kimi-K2.6 checkpoint whose text decoder is the Kimi-K2 family 1T/32B sparse MoE MLA language model: 61 layers, one dense SwiGLU layer, 60 MoE layers, 384 routed experts with top-8 routing, one shared expert, 256K context, and native routed-expert INT4 weight-only quantization. The vision tower and multimodal projector are checkpoint capacity, not per-token text Decode work.",
+      "sources": {
+        "pinned_checkpoint_tree": "https://huggingface.co/moonshotai/Kimi-K2.6/tree/7eb5002f6aadc958aed6a9177b7ed26bb94011bb",
+        "pinned_model_card": "https://huggingface.co/moonshotai/Kimi-K2.6/blob/7eb5002f6aadc958aed6a9177b7ed26bb94011bb/README.md",
+        "pinned_checkpoint_config": "https://huggingface.co/moonshotai/Kimi-K2.6/blob/7eb5002f6aadc958aed6a9177b7ed26bb94011bb/config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/moonshotai/Kimi-K2.6/blob/7eb5002f6aadc958aed6a9177b7ed26bb94011bb/model.safetensors.index.json",
+        "pinned_deployment_guide": "https://huggingface.co/moonshotai/Kimi-K2.6/blob/7eb5002f6aadc958aed6a9177b7ed26bb94011bb/docs/deploy_guidance.md",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/moonshotai/Kimi-K2.6/revision/7eb5002f6aadc958aed6a9177b7ed26bb94011bb",
+        "technical_report_tag": "https://arxiv.org/abs/2602.02276"
+      },
+      "architecture": {
+        "text_hidden_size": 7168,
+        "text_layers": 61,
+        "text_vocab_size": 163840,
+        "query_heads": 64,
+        "query_lora_rank": 1536,
+        "kv_lora_rank": 512,
+        "qk_nope_head_dim": 128,
+        "qk_rope_head_dim": 64,
+        "value_head_dim": 128,
+        "dense_first_layers": 1,
+        "dense_intermediate_size": 18432,
+        "moe_layers": 60,
+        "moe_intermediate_size_per_expert": 2048,
+        "routed_experts_per_layer": 384,
+        "selected_routed_experts_per_token": 8,
+        "shared_experts_per_layer": 1,
+        "activation": "SwiGLU",
+        "attention_mechanism": "MLA",
+        "position_encoding": "RoPE with YaRN scaling",
+        "rope_theta": 50000,
+        "rope_scaling": {
+          "type": "yarn",
+          "factor": 64.0,
+          "original_max_position_embeddings": 4096,
+          "beta_fast": 32.0,
+          "beta_slow": 1.0,
+          "mscale": 1.0,
+          "mscale_all_dim": 1.0
+        },
+        "text_context_tokens": 262144,
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "sparse_moe": true,
+        "routing_scoring_function": "sigmoid",
+        "routing_method": "noaux_tc",
+        "normalize_topk_probability": true,
+        "routed_scaling_factor": 2.827,
+        "vision_encoder": "MoonViT",
+        "vision_encoder_parameter_label": "400M official rounded",
+        "vision_decode_boundary": "excluded from text Decode matrix FLOPs and weight traffic"
+      },
+      "reported_total_parameters": {
+        "value": 1,
+        "unit": "trillion_parameters",
+        "precision": "official_rounded_language_model_label"
+      },
+      "reported_active_parameters": {
+        "value": 32,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "parameter_breakdown": {
+        "one_layer_mla_projection_matrices": 101122048,
+        "all_mla_projection_matrices": 6168444928,
+        "dense_layer0_swiglu": 396361728,
+        "one_routed_or_shared_expert_in_one_layer": 44040192,
+        "all_routed_experts": 1014686023680,
+        "active_routed_experts_per_token": 21139292160,
+        "all_shared_experts": 2642411520,
+        "one_moe_router": 2752512,
+        "all_moe_routers": 165150720,
+        "untied_lm_head": 1174405120,
+        "engine_always_active_matrix_parameters": 10546774016,
+        "engine_active_matrix_parameters_per_token": 31686066176,
+        "engine_all_resident_matrix_groups": 1025232797696,
+        "untied_input_embedding_parameter_elements": 1174405120,
+        "all_unique_text_matrix_parameters": 1026407202816,
+        "rmsnorm_parameter_elements": 1006592,
+        "fp32_router_correction_bias_parameter_elements": 23040,
+        "exact_text_original_model_parameter_elements": 1026408232448,
+        "active_matrix_parameter_elements_per_token": 31686066176,
+        "active_parameter_ratio": 0.030870822324201578
+      },
+      "checkpoint_tensor_inventory": {
+        "safetensor_shard_count": 64,
+        "tensor_count": 208550,
+        "text_tensor_count": 208215,
+        "vision_tensor_count": 329,
+        "mm_projector_tensor_count": 6,
+        "bf16_tensor_elements_total_checkpoint": 43902267888,
+        "f32_tensor_elements_total_checkpoint": 23040,
+        "i32_packed_container_elements_total_checkpoint": 126835891200,
+        "exact_tensor_payload_bytes_total_checkpoint": 595148192736,
+        "exact_tensor_payload_bytes_text_decoder_and_lm": 594205904896,
+        "exact_tensor_payload_bytes_vision_tower": 833732064,
+        "exact_tensor_payload_bytes_mm_projector": 108555776,
+        "index_total_size_bytes": 595148192736,
+        "i32_interpretation": "I32 tensors are packed INT4 routed-expert containers and packed shape metadata, not 32-bit model weights. Logical parameter counts must be reconstructed from config and tensor names rather than multiplying I32 elements by 4 as original parameters."
+      },
+      "weight_capacity": {
+        "int4_routed_expert_weight_payload_bytes": 507343011840,
+        "bf16_unquantized_text_payload_bytes": 23444371456,
+        "fp32_router_correction_bias_parameter_payload_bytes": 92160,
+        "original_text_model_parameter_payload_bytes": 530787475456,
+        "bf16_group_scale_elements": 31708938240,
+        "bf16_group_scale_bytes": 63417876480,
+        "int32_weight_shape_metadata_bytes": 552960,
+        "quantization_metadata_bytes": 63418429440,
+        "text_decode_weight_capacity_bytes": 594205904896,
+        "vision_and_projector_capacity_bytes": 942287840,
+        "total_checkpoint_tensor_capacity_bytes": 595148192736,
+        "capacity_note": "The engine workload represents text Decode. Vision tower and multimodal projector are not executed per generated token, but their checkpoint capacity is recorded because a multimodal service may keep them resident."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 63372132352,
+        "matrix_weight_payload_read_bytes_at_batch1": 31663194112,
+        "routed_expert_scale_read_bytes_at_batch1_if_streamed_with_selected_experts": 1321205760,
+        "matrix_payload_plus_routed_scale_bytes_at_batch1_if_streamed": 32984399872,
+        "scale_traffic_engine_status": "excluded_from_engine_result",
+        "attention_flops_per_token_coefficient_times_context": 8495104,
+        "mla_kv_bytes_per_historical_token_per_layer": 1152,
+        "mla_kv_bytes_per_historical_token_all_layers": 70272,
+        "mla_kv_capacity_bytes_per_request_at_max_context": 18421383168,
+        "input_embedding_row_read_bytes_per_request": 14336
+      },
+      "precision_profile": {
+        "profile": "official_2026_native_qat_int4_routed_experts_bf16_other_and_kv",
+        "quantization_format": "compressed-tensors pack-quantized",
+        "routed_expert_weight_dtype": "symmetric static INT4, group size 32",
+        "routed_expert_activation_dtype": "unquantized by checkpoint; BF16 model execution profile",
+        "routed_expert_scale_dtype": "bfloat16",
+        "attention_dense_shared_router_embedding_head_norm_dtype": "bfloat16",
+        "router_correction_bias_dtype": "float32",
+        "kv_dtype": "bfloat16",
+        "weight_precision_evidence": "The pinned quantization config declares compressed-tensors INT4 with self-attention, shared experts, dense MLP, LM head, vision tower, and multimodal projector ignored. The model card states Kimi-K2.6 adopts the same native INT4 quantization method as Kimi-K2-Thinking.",
+        "kv_precision_evidence": "quantization_config.kv_cache_scheme is null, dtype is bfloat16, and the official vLLM/SGLang commands do not override KV dtype. This selected service profile therefore uses BF16 logical MLA KV.",
+        "kv_precision_evidence_grade": "B",
+        "quantization_metadata_traffic": "The current schema cannot express zero-FLOP routed-expert scale traffic that follows the same batch-shared expert union. Scales and packed-shape metadata are included in capacity but not in engine weight_read_bytes."
+      },
+      "context_note": "The model card reports 256K context and the pinned text config gives max_position_embeddings=262144. Thinking, tool-use and vision inputs change the number of Decode steps and the context trajectory, not the static formula for one generated text token.",
+      "multimodal_boundary_note": "Kimi-K2.6 is image/video-text-to-text. This config isolates the language-model Decode path. Image/video encoder work and mm_projector work belong to multimodal prefill/input processing, not per-token Decode.",
+      "routing_note": "No public serving routing trace is available, so batch expert traffic uses the engine's uniform-independent union estimate. It does not reproduce token correlation, load balancing, expert placement, dispatch, or expert-parallel communication.",
+      "implementation_note": "The logical-superchip baseline excludes TP/EP communication, expert dispatch, collectives, kernel padding, temporary activation materialization, framework workspace, sampling, and speculative decoding."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 4,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      262144
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

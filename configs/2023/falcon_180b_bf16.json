@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Falcon 180B native BF16 weight+KV deployment",
+    "max_context_tokens": 2048,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_multigroup_attention_projections",
+          "parameters": 36490444800,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_gelu_ffn",
+          "parameters": 141096386560,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_tied_lm_head",
+          "parameters": 965476352,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16,
+      "output_head_parameters": 965476352,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "80 full-context multigroup GQA layers",
+        "layers": 80,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 232,
+              "kv_heads": 8,
+              "head_dim": 64,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 29696
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "flagship_resource_demand",
+      "release_date": "2023-09-06",
+      "checkpoint": "tiiuae/falcon-180B base model",
+      "architecture_summary": "Dense causal decoder-only Transformer with GeLU FFN, parallel Attention/FFN blocks, full-context eight-KV-head multigroup GQA, RoPE, and tied input/output embeddings.",
+      "sources": {
+        "tii_release": "https://www.tii.ae/news/technology-innovation-institute-introduces-worlds-most-powerful-open-llm-falcon-180b",
+        "release_and_inference": "https://huggingface.co/blog/falcon-180b",
+        "model_card": "https://huggingface.co/tiiuae/falcon-180B",
+        "checkpoint_config": "https://huggingface.co/tiiuae/falcon-180B/blob/main/config.json",
+        "architecture_paper": "https://arxiv.org/abs/2311.16867",
+        "transformers_falcon_implementation": "https://github.com/huggingface/transformers/blob/v4.33.0/src/transformers/models/falcon/modeling_falcon.py"
+      },
+      "architecture": {
+        "hidden_size": 14848,
+        "intermediate_size": 59392,
+        "layers": 80,
+        "query_heads": 232,
+        "kv_heads": 8,
+        "head_dim": 64,
+        "vocab_size": 65024,
+        "activation": "GeLU",
+        "position_encoding": "RoPE",
+        "parallel_attention_ffn": true,
+        "separate_attention_and_mlp_layer_norms": true,
+        "attention_variant": "multigroup GQA with one KV head per training tensor-parallel rank",
+        "tie_word_embeddings": true,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 180,
+        "unit": "billion_parameters",
+        "precision": "rounded_as_reported"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 36490444800,
+        "dense_gelu_ffn": 141096386560,
+        "tied_lm_head": 965476352,
+        "engine_matrix_parameters": 178552307712
+      },
+      "parameter_count_convention": "Counts matrix weights executed for one Decode token. Per layer, QKV parameters are hidden_size * (hidden_size + 2 * kv_heads * head_dim), attention output is hidden_size squared, and the two GeLU FFN matrices total 8 * hidden_size squared. The shared 65024-row embedding is counted once as the full LM head, while input lookup is represented by one BF16 row read. LayerNorm parameters, elementwise GeLU/RoPE, attention softmax, logits materialization, and implementation padding are excluded.",
+      "precision_profile": {
+        "profile": "official_2023_native_bfloat16_inference",
+        "weight_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The released checkpoint is BF16 and the official 2023 inference example loads it with torch_dtype=torch.bfloat16.",
+        "kv_precision_evidence": "The official BF16 inference path executes projected keys and values in BF16 and does not specify a separate cache quantization cast, so the retained KV state is modeled as BF16.",
+        "quantization_metadata": "not_applicable_to_native_bfloat16_profile",
+        "contemporary_alternative_profiles": "The 2023 Hugging Face release also demonstrated bitsandbytes 8-bit and 4-bit/GPTQ inference. They are not additional model samples; this flagship resource-envelope configuration uses the native BF16 reference path."
+      },
+      "context_note": "2048 is the published training and native sequence length. Transformers 4.33 exposed optional RoPE scaling, but no particular extended-context Falcon-180B release is part of this profile.",
+      "attention_note": "Falcon calls this scheme multigroup multiquery attention: Falcon-180B keeps eight independent KV heads, one per training tensor-parallel rank. On the logical superchip it is exactly represented as full-context GQA with 232 query heads and 8 KV heads.",
+      "implementation_note": "FlashAttention and physical tensor-parallel layout affect kernel traffic and communication, not the logical full-context Decode FLOPs or KV capacity modeled here; they are outside this baseline."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

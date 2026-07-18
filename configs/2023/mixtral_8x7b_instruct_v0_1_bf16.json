@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Mixtral 8x7B Instruct v0.1 native BF16 weight+KV deployment",
+    "max_context_tokens": 32768,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_gqa_projections",
+          "parameters": 1342177280,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 1048576,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 131072000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "bf16_routed_swiglu_experts",
+          "layers": 32,
+          "expert_count": 8,
+          "selected_per_token": 2,
+          "parameters_per_expert": 176160768,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 16
+        }
+      ],
+      "weight_bits": 16,
+      "output_head_parameters": 131072000,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "32 full-context GQA layers",
+        "layers": 32,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 32,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 8192
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "architecture_evolution_contrast",
+      "release_date": "2023-12-11",
+      "checkpoint": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+      "architecture_summary": "Sparse MoE causal decoder-only Transformer with eight SwiGLU experts per layer and top-2 routing, full-context GQA, RoPE, pre-RMSNorm, and untied input embedding and LM head; instruction-tuned with SFT and DPO.",
+      "sources": {
+        "official_release_blog": "https://mistral.ai/news/mixtral-of-experts/",
+        "release_lifecycle": "https://legal.mistral.ai/ai-governance/models/mixtral-8-7b",
+        "official_model_documentation": "https://docs.mistral.ai/models/model-cards/mixtral-8x7b-0-1",
+        "technical_report": "https://arxiv.org/abs/2401.04088",
+        "checkpoint_model_card": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "checkpoint_config_2023_correction": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/blob/125c431e2ff41a156b9f9076f744d2f35dd6e67a/config.json",
+        "current_checkpoint_config": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/blob/main/config.json",
+        "checkpoint_index": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/blob/main/model.safetensors.index.json",
+        "checkpoint_api": "https://huggingface.co/api/models/mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "release_commit": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/commit/e1772729e81114d6916dc5bb709738b07dae76e1",
+        "full_attention_correction": "https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/commit/125c431e2ff41a156b9f9076f744d2f35dd6e67a",
+        "transformers_4_36_implementation": "https://github.com/huggingface/transformers/blob/v4.36.0/src/transformers/models/mixtral/modeling_mixtral.py",
+        "transformers_4_36_cache": "https://github.com/huggingface/transformers/blob/v4.36.0/src/transformers/cache_utils.py"
+      },
+      "architecture": {
+        "hidden_size": 4096,
+        "intermediate_size_per_expert": 14336,
+        "layers": 32,
+        "query_heads": 32,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 32000,
+        "experts_per_layer": 8,
+        "selected_experts_per_token": 2,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "sliding_window": null,
+        "position_encoding": "RoPE",
+        "rope_theta": 1000000,
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "router_bias": false,
+        "sparse_moe": true
+      },
+      "reported_total_parameters": {
+        "value": 46.7,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "reported_active_parameters": {
+        "value": 12.9,
+        "unit": "billion_parameters",
+        "precision": "official_rounded; project reconstruction uses shared parameter elements plus top-2 experts"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 1342177280,
+        "moe_routers": 1048576,
+        "one_expert_in_one_layer": 176160768,
+        "all_routed_experts": 45097156608,
+        "active_routed_experts_per_token": 11274289152,
+        "untied_lm_head": 131072000,
+        "engine_always_active_matrix_parameters": 1474297856,
+        "engine_active_matrix_parameters_per_token": 12748587008,
+        "untied_input_embedding_parameter_elements": 131072000,
+        "all_unique_matrix_parameters": 46702526464,
+        "rmsnorm_parameters": 266240,
+        "exact_total_parameter_elements": 46702792704,
+        "shared_parameter_elements_for_active_subset": 1605636096,
+        "reconstructed_active_parameter_subset_top2": 12879925248
+      },
+      "weight_capacity": {
+        "bf16_trainable_weight_payload_bytes": 93405585408,
+        "untied_input_embedding_payload_bytes": 262144000,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_bf16_profile",
+        "total_weight_capacity_bytes": 93405585408,
+        "capacity_note": "The exact BF16 payload contains every expert, both untied 32000-by-4096 embedding/head matrices, routers, attention projections, and RMSNorm weights. The configuration records full input-embedding capacity only in metadata because the current engine does not model or output resident weight capacity; engine traffic reads one BF16 embedding row per request."
+      },
+      "parameter_count_convention": "The engine counts parameterized matrices executed for one Decode token. Attention projections, all routers, the full LM head, and two experts per layer contribute 12748587008 active matrix elements. This project reconstructs 12879925248 parameter elements by adding complete shared parameter capacity to two experts per layer, which matches the official rounded 12.9B figure; the reconstructed capacity subset must not be inserted as always-active engine work. Expert top-k selection, weighted output combination, normalization, RoPE, and other elementwise operations are outside matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "official_2023_native_bfloat16_checkpoint_inference",
+        "weight_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The official checkpoint config declares torch_dtype=bfloat16 and every safetensors parameter reported by the official API is BF16.",
+        "kv_precision_evidence": "When the checkpoint is explicitly executed in BF16, projected key_states and value_states are BF16, and Transformers 4.36 DynamicCache stores them without a dtype conversion. The retained KV state is therefore BF16 for this selected execution path.",
+        "alternative_precision_note": "The official model card also demonstrates an explicit FP16 inference path. That is a separate deployment profile and is not mixed into this native BF16 sample.",
+        "quantization_metadata": "not_applicable_to_native_bf16_profile"
+      },
+      "context_note": "32768 is the published trained context and uses fully dense attention. Early Hugging Face integration configs briefly carried a sliding_window value; the official 2023-12-15 correction states that Mixtral was never meant to support sliding-window attention and sets it to null.",
+      "routing_note": "At batch 1, every layer reads exactly two selected expert weight sets. For larger batches, the configured uniform-independent formula estimates the union of experts touched per layer because no serving routing trace is available; it is an analysis assumption, not an observed deployment distribution.",
+      "active_parameter_note": "This project reconstructs the official rounded 12.9B figure as complete shared parameter capacity plus two experts per layer; the official source does not publish that exact counting formula. Batch weight traffic depends on the union of experts selected by all tokens and can approach all eight experts per layer even though per-token compute remains top-2.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both full matrices. Decode reads one 4096-element BF16 input row per request, while the complete LM head is logically read once per scheduler step and then amortized across B outputs.",
+      "instruction_tuning_note": "SFT and DPO change checkpoint values and serving behavior but do not change matrix shapes or Decode workload formulas relative to the corresponding base release.",
+      "implementation_note": "The logical-superchip baseline excludes physical tensor/expert-parallel communication, routing-dispatch traffic, kernel padding, and temporary activation materialization."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

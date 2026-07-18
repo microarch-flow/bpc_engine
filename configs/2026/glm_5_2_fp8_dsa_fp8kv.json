@@ -1,0 +1,282 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "GLM-5.2-FP8 MLA+DSA IndexShare actual FP8 deployment",
+    "max_context_tokens": 1048576,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "fp8_main_mla_projections",
+          "parameters": 12871532544,
+          "weight_bits": 8
+        },
+        {
+          "name": "fp8_three_dense_ffns",
+          "parameters": 679477248,
+          "weight_bits": 8
+        },
+        {
+          "name": "fp8_shared_experts",
+          "parameters": 2831155200,
+          "weight_bits": 8
+        },
+        {
+          "name": "fp8_indexer_query_and_key_projections",
+          "parameters": 192675840,
+          "weight_bits": 8
+        },
+        {
+          "name": "bf16_indexer_head_weight_projections",
+          "parameters": 4128768,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 117964800,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_lm_head",
+          "parameters": 951582720,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "fp8_routed_ffn_experts",
+          "layers": 75,
+          "expert_count": 256,
+          "selected_per_token": 8,
+          "parameters_per_expert": 37748736,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 8
+        }
+      ],
+      "weight_bits": 8,
+      "output_head_parameters": 951582720,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "21 MLA+DSA layers with full indexers",
+        "layers": 21,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "dsa",
+              "top_k": 2048,
+              "index_entry_elements": 128,
+              "index_query_heads": 32,
+              "index_head_dim": 128,
+              "index_bits": 16,
+              "selection_flops_per_candidate": 65
+            }
+          }
+        ]
+      },
+      {
+        "name": "57 MLA+DSA layers reusing shared top-k indices",
+        "layers": 57,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 8,
+              "rope_bits": 8
+            },
+            "access": {
+              "kind": "fixed_topk",
+              "top_k": 2048
+            }
+          }
+        ]
+      },
+      {
+        "name": "bf16 input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "work": {
+              "other_read_bytes": 12288
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "role": "2026 architecture-evolution contrast sample",
+      "checkpoint": "zai-org/GLM-5.2-FP8",
+      "fixed_revision": "ba978f7d347eaf65d22f1a86833408afdb953541",
+      "initial_public_timestamp_utc": "2026-06-16T07:20:33Z",
+      "selected_revision_timestamp_utc": "2026-07-02T08:09:27Z",
+      "ytd_cutoff": "2026-07-17",
+      "observed_huggingface_downloads_on_2026_07_18": 3032964,
+      "observed_huggingface_likes_on_2026_07_18": 217,
+      "sources": {
+        "model_card": "https://huggingface.co/zai-org/GLM-5.2-FP8/blob/ba978f7d347eaf65d22f1a86833408afdb953541/README.md",
+        "config": "https://huggingface.co/zai-org/GLM-5.2-FP8/blob/ba978f7d347eaf65d22f1a86833408afdb953541/config.json",
+        "safetensors_index": "https://huggingface.co/zai-org/GLM-5.2-FP8/blob/ba978f7d347eaf65d22f1a86833408afdb953541/model.safetensors.index.json",
+        "huggingface_api": "https://huggingface.co/api/models/zai-org/GLM-5.2-FP8",
+        "vllm_recipe": "https://recipes.vllm.ai/zai-org/GLM-5.2",
+        "glm52_blog": "https://huggingface.co/blog/zai-org/glm-52-blog"
+      },
+      "architecture": {
+        "model_type": "glm_moe_dsa",
+        "hidden_size": 6144,
+        "layers_in_baseline": 78,
+        "mtp_layers_excluded_from_baseline": 1,
+        "dense_layers": 3,
+        "moe_layers": 75,
+        "query_heads": 64,
+        "q_lora_rank": 2048,
+        "kv_lora_rank": 512,
+        "qk_nope_head_dim": 192,
+        "qk_rope_head_dim": 64,
+        "qk_head_dim": 256,
+        "value_head_dim": 256,
+        "indexer_layers": 21,
+        "shared_index_layers": 57,
+        "index_heads": 32,
+        "index_head_dim": 128,
+        "index_top_k": 2048,
+        "index_topk_freq": 4,
+        "index_skip_topk_offset": 3,
+        "experts_per_layer": 256,
+        "experts_per_token": 8,
+        "shared_experts_per_layer": 1,
+        "moe_intermediate_size": 2048,
+        "dense_intermediate_size": 12288,
+        "vocab_size": 154880,
+        "max_position_embeddings": 1048576,
+        "tie_word_embeddings": false
+      },
+      "precision_profile": {
+        "checkpoint_quantization": "FP8 E4M3 dynamic, 128x128 weight blocks",
+        "fp8_weight_groups": [
+          "MLA projections",
+          "first three dense FFNs",
+          "shared experts",
+          "routed experts",
+          "indexer wq_b/wk projections"
+        ],
+        "bf16_weight_groups": [
+          "lm_head",
+          "input embedding",
+          "MoE routers",
+          "indexer weights_proj",
+          "normalization weights"
+        ],
+        "f32_tensor_groups_excluded_from_engine_traffic": [
+          "FP8 weight_scale_inv tensors",
+          "MoE e_score_correction_bias tensors"
+        ],
+        "kv_profile": "vLLM FP8 serving profile uses --kv-cache-dtype fp8/fp8_e4m3 for MLA latent and RoPE KV cache.",
+        "index_profile": "DSA index keys remain modeled as BF16 128-element entries scanned by full-indexer layers.",
+        "engine_boundary": "The current schema cannot express zero-FLOP FP8 scale_inv traffic or correction-bias traffic. They are included in checkpoint payload bytes but excluded from engine weight_read_bytes."
+      },
+      "parameter_breakdown": {
+        "main_mla_projections": 12871532544,
+        "three_dense_ffns": 679477248,
+        "shared_experts": 2831155200,
+        "fp8_indexer_query_and_key_projections": 192675840,
+        "bf16_indexer_head_weight_projections": 4128768,
+        "bf16_sparse_moe_routers": 117964800,
+        "bf16_lm_head": 951582720,
+        "always_active_total": 17648517120,
+        "one_routed_expert_per_layer": 37748736,
+        "active_routed_experts": 22649241600,
+        "active_matrix_parameters_per_token": 40297758720,
+        "all_routed_expert_matrix_parameters": 724775731200,
+        "bf16_input_embedding_table": 951582720,
+        "main_baseline_matrix_parameters_including_embedding_and_all_experts": 743375831040,
+        "checkpoint_tensor_elements_including_mtp_scales_norms_and_biases": 753375793584,
+        "checkpoint_tensor_payload_bytes": 755617140416,
+        "safetensors_dtype_elements": {
+          "F8_E4M3": 751226191872,
+          "BF16": 2103729152,
+          "F32": 45872560
+        }
+      },
+      "indexshare_pattern": {
+        "full_indexer_layers": [
+          0,
+          1,
+          2,
+          6,
+          10,
+          14,
+          18,
+          22,
+          26,
+          30,
+          34,
+          38,
+          42,
+          46,
+          50,
+          54,
+          58,
+          62,
+          66,
+          70,
+          74
+        ],
+        "shared_index_layers": 57,
+        "note": "Grouping the 21 full-indexer layers and 57 shared-index layers preserves the exact Decode sum even though it does not preserve display order."
+      },
+      "decode_boundary_notes": {
+        "why_selected": "GLM-5.2-FP8 represents the 2026 long-context sparse-attention branch: 1M context, DSA top-k sparse attention, and IndexShare reuse of one indexer across four sparse-attention layers.",
+        "dsa_note": "Full indexer layers scan one 128-element BF16 key per prior token. The 65 extra FLOPs/candidate represent ReLU plus a 32-head weighted reduction; top-k sorting is excluded.",
+        "mla_note": "Main attention uses the absorbed MLA convention and stores only the 512-element latent plus the 64-element RoPE key per token and layer.",
+        "mtp_note": "GLM-5.2-FP8 supports MTP speculative serving, and vLLM recipes enable it in some commands. This baseline excludes MTP draft/verify work to stay comparable with the ordinary one-token Decode baseline used by the other yearly samples.",
+        "parameter_count_convention": "Counts matrix weights executed for one ordinary Decode token. Norms, biases, correction buffers, FP8 scales, and the full input embedding table are excluded from active parameter FLOPs; the LM head and one BF16 input embedding row read are included.",
+        "routing_note": "uniform_independent is an analytical batch-reuse assumption and should be replaced by explicit_unique when a serving trace is available."
+      }
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 8,
+    "index_bits": 16,
+    "state_bits": 16,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      524288,
+      1048576
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

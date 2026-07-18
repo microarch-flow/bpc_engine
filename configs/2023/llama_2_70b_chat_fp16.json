@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Llama 2 70B Chat native FP16 weight+KV deployment",
+    "max_context_tokens": 4096,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "fp16_gqa_projections",
+          "parameters": 12079595520,
+          "weight_bits": 16
+        },
+        {
+          "name": "fp16_swiglu_ffn",
+          "parameters": 56371445760,
+          "weight_bits": 16
+        },
+        {
+          "name": "fp16_untied_lm_head",
+          "parameters": 262144000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16,
+      "output_head_parameters": 262144000,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "80 full-context GQA layers",
+        "layers": 80,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 64,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 16384
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "mainstream_deployment",
+      "release_date": "2023-07-18",
+      "checkpoint": "meta-llama/Llama-2-70b-chat-hf",
+      "architecture_summary": "Dense causal decoder-only Transformer with SwiGLU FFN, full-context GQA, RoPE, RMSNorm, and untied input embedding and LM head; fine-tuned with SFT and RLHF for dialogue deployment.",
+      "sources": {
+        "release": "https://about.fb.com/news/2023/07/llama-2/",
+        "official_model_card": "https://github.com/meta-llama/llama-models/blob/main/models/llama2/MODEL_CARD.md",
+        "paper": "https://arxiv.org/abs/2307.09288",
+        "checkpoint_model_card": "https://huggingface.co/meta-llama/Llama-2-70b-chat-hf",
+        "checkpoint_config": "https://huggingface.co/meta-llama/Llama-2-70b-chat-hf/blob/main/config.json",
+        "checkpoint_index": "https://huggingface.co/meta-llama/Llama-2-70b-chat-hf/blob/main/model.safetensors.index.json",
+        "checkpoint_api": "https://huggingface.co/api/models/meta-llama/Llama-2-70b-chat-hf",
+        "meta_inference": "https://github.com/meta-llama/llama/blob/main/llama/generation.py",
+        "transformers_4_31_implementation": "https://github.com/huggingface/transformers/blob/v4.31.0/src/transformers/models/llama/modeling_llama.py"
+      },
+      "architecture": {
+        "hidden_size": 8192,
+        "intermediate_size": 28672,
+        "layers": 80,
+        "query_heads": 64,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 32000,
+        "activation": "SwiGLU",
+        "position_encoding": "RoPE",
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "rope_theta": 10000,
+        "rope_scaling": null,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 70,
+        "unit": "billion_parameters",
+        "precision": "rounded_model_name"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 12079595520,
+        "dense_swiglu_ffn": 56371445760,
+        "untied_lm_head": 262144000,
+        "engine_matrix_parameters": 68713185280,
+        "untied_input_embedding_capacity_only": 262144000,
+        "all_matrix_parameters": 68975329280,
+        "excluded_rmsnorm_parameters": 1318912,
+        "exact_total_parameter_elements": 68976648192
+      },
+      "weight_capacity": {
+        "fp16_trainable_weight_payload_bytes": 137953296384,
+        "non_parameter_fp32_rope_inv_freq_elements": 5120,
+        "non_parameter_fp32_rope_inv_freq_bytes": 20480,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_fp16_profile",
+        "total_weight_capacity_bytes": 137953296384,
+        "capacity_note": "The FP16 trainable-weight capacity includes both untied 32000-by-8192 embedding/head matrices and all RMSNorm weights. Official Hugging Face metadata separately reports 5120 FP32 RoPE inv_freq buffer elements; they are non-parameter implementation state and remain outside total_weight_capacity_bytes. The current engine step-work groups include the full LM head but not the full input embedding or RMSNorm tensors."
+      },
+      "parameter_count_convention": "Counts matrix weights executed for one Decode token. Per layer, Q/K/V/O projection parameters are hidden_size * (hidden_size + 2 * kv_heads * head_dim) + hidden_size squared, and the three SwiGLU matrices total 3 * hidden_size * intermediate_size. The untied LM head is executed in full; the separate input embedding table is resident capacity but only one FP16 row is read per request and is represented as other_read_bytes. RMSNorm parameters, elementwise SwiGLU/RoPE, FP32 attention softmax, and logits materialization are excluded from engine matrix FLOPs.",
+      "precision_profile": {
+        "profile": "official_2023_huggingface_fp16_checkpoint_inference",
+        "weight_dtype": "float16",
+        "kv_dtype": "float16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The official Hugging Face metadata reports 68976648192 F16 trainable parameters and the config declares torch_dtype=float16. It separately reports 5120 F32 RoPE inv_freq buffer elements, which are not model parameters.",
+        "kv_precision_evidence": "Transformers 4.31 directly stores projected key_states and value_states as past_key_value without a cache dtype conversion. Under the checkpoint's FP16 inference path the retained KV state is therefore FP16.",
+        "attention_softmax_dtype": "float32_then_cast_back",
+        "quantization_metadata": "not_applicable_to_native_fp16_profile"
+      },
+      "context_note": "4096 is the native Llama 2 release context. Longer C values require either a future explicit extrapolation path with is_extrapolated=true or a separate long-context derivative release; the current engine rejects C above max_context_tokens.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity counts both full matrices, while Decode traffic reads one input row plus the full LM head.",
+      "chat_tuning_note": "SFT and RLHF change checkpoint values and serving behavior but do not change the matrix shapes or Decode workload formulas relative to the 70B base architecture.",
+      "implementation_note": "The reference cache stores eight KV heads and repeats them only for attention computation. Physical tensor-parallel communication, fused-kernel traffic, and temporary FP32 softmax storage are outside the logical-superchip baseline."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      4096
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

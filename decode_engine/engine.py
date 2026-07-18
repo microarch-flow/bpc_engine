@@ -484,6 +484,8 @@ def calculate_decode(
     model: ModelConfig,
     deployment: DeploymentConfig,
     context_tokens: Sequence[int],
+    *,
+    allow_extrapolation: bool = False,
 ) -> DecodeResult:
     """Calculate one decode step and normalize it per generated token.
 
@@ -493,6 +495,10 @@ def calculate_decode(
         context_tokens: One existing-context length for each active request.
             Supplying ``[32768] * 32`` describes a batch of 32 equal-length
             requests.  Different values model continuous batching directly.
+        allow_extrapolation: Permit contexts above ``model.max_context_tokens``.
+            The caller remains responsible for marking those research records
+            as extrapolated.  The safe default preserves strict deployment
+            validation.
     """
 
     contexts = tuple(context_tokens)
@@ -502,7 +508,7 @@ def calculate_decode(
         raise ValueError("every context length must be an integer")
     if any(value < 0 for value in contexts):
         raise ValueError("context lengths must be >= 0")
-    if model.max_context_tokens is not None and any(
+    if not allow_extrapolation and model.max_context_tokens is not None and any(
         value > model.max_context_tokens for value in contexts
     ):
         raise ValueError(
@@ -547,6 +553,8 @@ def calculate_grid(
     config: EngineConfig,
     contexts: Iterable[int] | None = None,
     batches: Iterable[int] | None = None,
+    *,
+    allow_extrapolation: bool = False,
 ) -> list[DecodeResult]:
     """Calculate equal-context batches over a context/batch parameter grid."""
 
@@ -573,6 +581,7 @@ def calculate_grid(
                     config.model,
                     config.deployment,
                     [context] * batch,
+                    allow_extrapolation=allow_extrapolation,
                 )
             )
     return results

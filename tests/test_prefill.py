@@ -817,7 +817,6 @@ class PrefillConfigurationTests(unittest.TestCase):
     def test_all_shipped_configs_execute_prefill(self):
         root = Path(__file__).resolve().parents[1]
         paths = sorted((root / "configs").rglob("*.json"))
-        self.assertEqual(len(paths), 27)
 
         for path in paths:
             with self.subTest(config=str(path.relative_to(root))):

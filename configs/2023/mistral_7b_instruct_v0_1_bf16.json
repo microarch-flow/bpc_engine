@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Mistral 7B Instruct v0.1 native BF16 weight+KV rolling-SWA deployment",
+    "max_context_tokens": 8192,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_gqa_projections",
+          "parameters": 1342177280,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_swiglu_ffn",
+          "parameters": 5637144576,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 131072000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16,
+      "output_head_parameters": 131072000,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "32 sliding-window GQA layers",
+        "layers": 32,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 32,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "swa",
+              "window_tokens": 4096
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 8192
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "mechanism_anchor",
+      "release_date": "2023-09-27",
+      "checkpoint": "mistralai/Mistral-7B-Instruct-v0.1",
+      "checkpoint_revision": "464c09acb438a06c3a5eaafa25b90069df87efca",
+      "architecture_summary": "Dense causal decoder-only Transformer with SwiGLU FFN, sliding-window GQA, RoPE, pre-RMSNorm, and untied input embedding and LM head; instruction-tuned from Mistral 7B v0.1.",
+      "sources": {
+        "official_release_blog": "https://mistral.ai/news/announcing-mistral-7b/",
+        "official_model_documentation": "https://docs.mistral.ai/models/model-cards/mistral-7b-0-1",
+        "official_governance_record": "https://legal.mistral.ai/ai-governance/models/mistral-7-b",
+        "technical_report": "https://arxiv.org/abs/2310.06825",
+        "checkpoint_model_card": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1",
+        "pinned_checkpoint_config": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1/blob/464c09acb438a06c3a5eaafa25b90069df87efca/config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.1/blob/464c09acb438a06c3a5eaafa25b90069df87efca/model.safetensors.index.json",
+        "pinned_revision_api": "https://huggingface.co/api/models/mistralai/Mistral-7B-Instruct-v0.1/revision/464c09acb438a06c3a5eaafa25b90069df87efca"
+      },
+      "architecture": {
+        "hidden_size": 4096,
+        "intermediate_size": 14336,
+        "layers": 32,
+        "query_heads": 32,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 32000,
+        "activation": "SwiGLU",
+        "attention_access": "sliding_window",
+        "sliding_window_tokens": 4096,
+        "position_encoding": "RoPE",
+        "rope_theta": 10000,
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 7.3,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 1342177280,
+        "dense_swiglu_ffn": 5637144576,
+        "transformer_projection_and_ffn_matrices": 6979321856,
+        "untied_lm_head": 131072000,
+        "engine_matrix_parameters": 7110393856,
+        "untied_input_embedding_capacity_only": 131072000,
+        "all_unique_matrix_parameters": 7241465856,
+        "rmsnorm_parameters": 266240,
+        "exact_total_parameter_elements": 7241732096
+      },
+      "weight_capacity": {
+        "bf16_trainable_weight_payload_bytes": 14483464192,
+        "untied_input_embedding_payload_bytes": 262144000,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_bf16_profile",
+        "total_weight_capacity_bytes": 14483464192,
+        "capacity_note": "The pinned revision API reports 7241732096 BF16 parameter elements, and the safetensors index reports a 14483464192-byte payload. Capacity includes both untied embedding matrices and all RMSNorm weights. Engine Decode traffic reads one BF16 input-embedding row per request and the full LM head."
+      },
+      "decode_capacity_anchors": {
+        "kv_bytes_per_history_token_per_request_all_layers": 131072,
+        "rolling_kv_capacity_bytes_per_request_at_or_above_window": 536870912,
+        "window_saturation_context_tokens": 4096
+      },
+      "parameter_count_convention": "Counts parameterized matrices executed for one Decode token. Per layer, Q/K/V/O projections contribute 41943040 parameters and the three SwiGLU matrices contribute 176160768; 32 layers plus the full untied LM head total 7110393856 active matrix parameters. The separate input embedding is resident capacity but only one BF16 row is read per request. RMSNorm, RoPE, SiLU, attention softmax, and logits materialization are excluded from engine matrix FLOPs.",
+      "precision_profile": {
+        "profile": "official_2023_native_bfloat16_checkpoint_with_rolling_swa_cache",
+        "weight_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The pinned official revision config declares torch_dtype=bfloat16, and its API reports all 7241732096 checkpoint parameter elements as BF16.",
+        "kv_precision_evidence": "This profile executes the native BF16 checkpoint without a KV dtype conversion, so projected keys and values retained by the rolling cache remain BF16.",
+        "quantization_metadata": "not_applicable_to_native_bf16_profile"
+      },
+      "context_profile": {
+        "advertised_max_context_tokens_at_release": 8192,
+        "trained_context_tokens": 8192,
+        "per_layer_sliding_window_tokens": 4096,
+        "checkpoint_max_position_embeddings": 32768,
+        "official_blog_swa_kernel_benchmark_sequence_tokens": 16384,
+        "engine_max_context_policy": "The top-level max follows the official v0.1 8K release context required by the research metric contract. The checkpoint's 32768 position ceiling and the 16K SWA kernel benchmark do not replace that historical model limit."
+      },
+      "context_note": "The 8K release context, 4K per-layer attention window, and 32K checkpoint position ceiling are different quantities. Standard trend points stop at C=8192. For every in-range C, the optimized rolling-cache profile reads and retains min(C,4096) KV entries per layer; a future C above 8192 must be explicitly marked as extrapolated.",
+      "swa_runtime_boundary": "The official release describes a rotating buffer that limits cache capacity to the 4096-token window. This configuration models that optimized deployment. A runtime that applies a local attention mask but retains the full historical KV cache is a different physical profile and must not reuse this capacity result.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both full matrices; Decode reads one 4096-element BF16 input row per request and the complete LM head once per scheduler step before batch amortization.",
+      "instruction_tuning_note": "Instruction tuning changes checkpoint values and serving behavior but not matrix shapes or the fixed-C one-token Decode formulas relative to Mistral 7B v0.1 base.",
+      "implementation_note": "The logical-superchip baseline excludes physical tensor-parallel communication, fused-kernel workspace, cache-ring pointer updates, eviction bookkeeping, elementwise operations, and temporary activation materialization."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      4096,
+      8192
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

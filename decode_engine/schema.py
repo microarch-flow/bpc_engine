@@ -95,10 +95,23 @@ class WorkCost:
             + self.other_read_bytes
         )
 
+    @property
+    def logical_hbm_bytes(self) -> float:
+        """Trend-study HBM traffic, excluding temporary activations.
+
+        ``total_bytes`` retains the historical engine behavior because Prefill
+        experiments may explicitly model activation traffic.  The Decode trend
+        contract uses this narrower view and keeps ``activation_bytes`` as a
+        diagnostic field instead of silently adding it to logical HBM traffic.
+        """
+
+        return self.total_bytes - self.activation_bytes
+
     def to_dict(self) -> dict[str, float]:
         result = asdict(self)
         result["total_flops"] = self.total_flops
         result["total_bytes"] = self.total_bytes
+        result["logical_hbm_bytes"] = self.logical_hbm_bytes
         return result
 
 
@@ -301,6 +314,19 @@ class DecodeResult:
         # 1 PFLOP/s * 1 Byte/FLOP = 10^15 Byte/s = 1000 TB/s.
         return self.bytes_per_flop * 1000.0
 
+    @property
+    def logical_hbm_bytes_per_flop(self) -> float:
+        flops = self.per_output_work.total_flops
+        return (
+            self.per_output_work.logical_hbm_bytes / flops
+            if flops
+            else float("inf")
+        )
+
+    @property
+    def logical_hbm_tbps_per_pflops(self) -> float:
+        return self.logical_hbm_bytes_per_flop * 1000.0
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "model": self.model_name,
@@ -316,6 +342,12 @@ class DecodeResult:
             "expert_weight_sets_read": dict(self.expert_weight_sets_read),
             "bytes_per_flop": self.bytes_per_flop,
             "tbps_per_pflops": self.tbps_per_pflops,
+            "logical_hbm_bytes_per_flop": (
+                self.logical_hbm_bytes_per_flop
+            ),
+            "logical_hbm_tbps_per_pflops": (
+                self.logical_hbm_tbps_per_pflops
+            ),
         }
 
 

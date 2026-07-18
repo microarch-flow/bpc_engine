@@ -248,6 +248,25 @@ def _sum_clamped_linear(start: int, count: int, cap: int) -> float:
     return linear_sum + (count - below_cap) * cap
 
 
+def _modulo_prefix_sum(count: int, modulus: int) -> int:
+    """Return ``sum(i % modulus, i=0..count-1)`` exactly."""
+
+    blocks, remainder = divmod(count, modulus)
+    return (
+        blocks * modulus * (modulus - 1) // 2
+        + remainder * (remainder - 1) // 2
+    )
+
+
+def _sum_modulo_sequence(start: int, count: int, modulus: int) -> float:
+    """Return ``sum((start+i) % modulus, i=0..count-1)``."""
+
+    return float(
+        _modulo_prefix_sum(start + count, modulus)
+        - _modulo_prefix_sum(start, modulus)
+    )
+
+
 def _floor_division_prefix(count: int, divisor: int) -> int:
     """Return ``sum(floor(i/divisor), i=0..count-1)`` exactly."""
 
@@ -377,6 +396,66 @@ class SlidingWindowAccess(AccessPattern):
             main_stored_entries=float(
                 min(cached_tokens + new_tokens, self.window_tokens)
             ),
+        )
+
+
+@dataclass(frozen=True)
+class ChunkedBlockAccess(AccessPattern):
+    """Attention restricted to one fixed, non-overlapping token block.
+
+    This is distinct from a sliding window.  At context ``C``, a query sees
+    ``C % chunk_tokens`` historical entries from its current block.  Some
+    runtimes nevertheless retain the complete per-layer KV history; the
+    explicit retention flag keeps that physical deployment choice separate
+    from the architectural read mask.
+    """
+
+    chunk_tokens: int
+    retain_full_history: bool
+
+    def evaluate(
+        self, context_tokens: int, deployment: DeploymentConfig
+    ) -> AccessStats:
+        del deployment
+        visible = float(context_tokens % self.chunk_tokens)
+        stored = (
+            float(context_tokens)
+            if self.retain_full_history
+            else visible
+        )
+        return AccessStats(visible, 1.0, stored)
+
+    def prefill_evaluate(
+        self,
+        cached_tokens: int,
+        new_tokens: int,
+        deployment: DeploymentConfig,
+        include_self_attention: bool = True,
+    ) -> PrefillAccessStats:
+        del deployment
+        _validate_prefill_arguments(
+            cached_tokens, new_tokens, include_self_attention
+        )
+        self_entries = int(include_self_attention)
+        compulsory_entries = (
+            cached_tokens % self.chunk_tokens if new_tokens else 0
+        )
+        final_tokens = cached_tokens + new_tokens
+        stored_entries = (
+            final_tokens
+            if self.retain_full_history
+            else final_tokens % self.chunk_tokens
+        )
+        return PrefillAccessStats(
+            main_compulsory_read_entries=float(compulsory_entries),
+            main_operand_read_entries=(
+                _sum_modulo_sequence(
+                    cached_tokens, new_tokens, self.chunk_tokens
+                )
+                + self_entries * new_tokens
+            ),
+            main_write_entries=float(new_tokens),
+            main_stored_entries=float(stored_entries),
         )
 
 
@@ -1297,6 +1376,13 @@ def build_access_pattern(config: Mapping[str, Any], path: str) -> AccessPattern:
     if kind in {"sliding_window", "swa"}:
         return SlidingWindowAccess(
             window_tokens=_int_positive(config, "window_tokens", path)
+        )
+    if kind in {"chunked_block", "block_local"}:
+        return ChunkedBlockAccess(
+            chunk_tokens=_int_positive(config, "chunk_tokens", path),
+            retain_full_history=_boolean(
+                config, "retain_full_history", path, True
+            ),
         )
     if kind in {"compressed_full", "hca"}:
         compression_ratio = _int_positive(

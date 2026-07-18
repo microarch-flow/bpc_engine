@@ -39,6 +39,26 @@
         ]
       },
       {
+        "name": "GQA with fixed non-overlapping chunks and full KV retention",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 40,
+              "kv_heads": 8,
+              "head_dim": 128
+            },
+            "access": {
+              "kind": "chunked_block",
+              "chunk_tokens": 8192,
+              "retain_full_history": true
+            }
+          }
+        ]
+      },
+      {
         "name": "GQA with DSA",
         "layers": 1,
         "mixers": [

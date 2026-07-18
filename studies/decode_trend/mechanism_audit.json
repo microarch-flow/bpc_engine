@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "audit_id": "decode-trend-p3-v1",
+  "dimensions": [
+    "flops",
+    "logical_hbm_traffic",
+    "cache_capacity",
+    "weight_capacity"
+  ],
+  "status_definitions": {
+    "supported": "The selected profile is represented by an explicit formula, auditable model facts, and a numerical anchor.",
+    "partially_supported": "The result is computable but depends on a deployment or statistical assumption that can materially affect the value.",
+    "unsupported": "A material mechanism behavior is absent, so the value must not enter the central trend fit.",
+    "not_applicable": "The mechanism does not contribute to this dimension."
+  },
+  "profiles": {
+    "grouped_full_attention": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "MHA, MQA and GQA use exact QK+AV FLOPs and logical KV entry bytes; softmax and temporary activations remain outside the metric contract.",
+      "anchors": ["C-linear attention FLOPs, KV reads and KV capacity", "one KV entry write per layer and Decode token"]
+    },
+    "grouped_sliding_window_attention": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "The selected rolling-cache deployment reads and retains min(C, window) entries.",
+      "anchors": ["C=4095/4096/4097 saturation boundary"]
+    },
+    "grouped_chunked_block_attention": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "partially_supported", "weight_capacity": "not_applicable"},
+      "boundary": "Visible reads follow C modulo 8192 exactly. Cache capacity depends on the selected full-history retention policy; completed-block eviction is a different deployment profile.",
+      "anchors": ["C=8191/8192/8193 reset boundary"]
+    },
+    "mla_full_attention": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "partially_supported", "weight_capacity": "not_applicable"},
+      "boundary": "The engine represents absorbed logical MLA. Cache becomes supported only when the selected runtime is evidenced to retain the latent plus RoPE representation rather than expanded K/V.",
+      "anchors": ["latent_dim plus rope_dim bytes per historical token", "QK plus AV absorbed-MLA FLOP coefficient"]
+    },
+    "mla_dsa": {
+      "dimensions": {"flops": "partially_supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "Indexer dot products and the configured per-candidate reduction are counted, but Top-k sorting/selection is excluded.",
+      "anchors": ["C=2047/2048/2049 Top-k saturation boundary", "full index scan remains linear in C"]
+    },
+    "mla_shared_fixed_topk": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "The layer reuses indices produced by a full indexer and performs only the selected MLA scan; index generation is accounted by the DSA layers.",
+      "anchors": ["main MLA reads saturate at Top-k", "no duplicate index capacity in shared layers"]
+    },
+    "mamba1_state": {
+      "dimensions": {"flops": "partially_supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "Projection and convolution weights are exact. State FLOPs use the documented five-FLOP core recurrence and exclude exponentials, softplus, gates and normalization.",
+      "anchors": ["state capacity and traffic are invariant with C"]
+    },
+    "explicit_kda_state": {
+      "dimensions": {"flops": "partially_supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "KDA uses explicit project recurrence FLOPs and the pinned vLLM FP32 matrix/BF16 short-conv state shapes; nonlinear gates and normalization are excluded.",
+      "anchors": ["state capacity and traffic are invariant with C", "short-conv state uses kernel_size minus one"]
+    },
+    "gated_deltanet_state": {
+      "dimensions": {"flops": "partially_supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "Matrix-state update/contraction and configured extras are counted; feature-map, gate and normalization operations do not have a hardware-independent FLOP equivalent.",
+      "anchors": ["state capacity and traffic are invariant with C"]
+    },
+    "short_conv_state": {
+      "dimensions": {"flops": "not_applicable", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "not_applicable"},
+      "boundary": "Convolution MACs are already in parameter FLOPs; this row audits only the persistent short-convolution history.",
+      "anchors": ["state capacity and traffic are invariant with C"]
+    },
+    "moe_uniform_routing": {
+      "dimensions": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "not_applicable", "weight_capacity": "supported"},
+      "boundary": "Top-k active expert matrix FLOPs and all-expert resident capacity are exact. B>1 weight traffic uses an independent uniform expected union because no serving trace is public.",
+      "anchors": ["B=1 touches exactly Top-k experts", "same-expert and no-reuse policies define sensitivity bounds"]
+    }
+  },
+  "models": [
+    {
+      "model_release_id": "google:palm-540b:2022-04-05",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "partially_supported"},
+      "mechanisms": [{"config_label": "softmax_attention:mqa:full", "layers": 118, "profile": "grouped_full_attention"}],
+      "known_gaps": ["INT8 quantization metadata and the full checkpoint inventory are unavailable."]
+    },
+    {
+      "model_release_id": "bigscience:bloom-176b:2022-07-12",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:mha:full", "layers": 70, "profile": "grouped_full_attention"}],
+      "known_gaps": ["Fixed-revision non-parameter checkpoint buffers were not audited."]
+    },
+    {
+      "model_release_id": "zai-org:glm-130b-int4:2022-08-24",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "partially_supported"},
+      "mechanisms": [{"config_label": "softmax_attention:mha:full", "layers": 70, "profile": "grouped_full_attention"}],
+      "known_gaps": ["Vector-wise INT4 scale storage and traffic are not closed."]
+    },
+    {
+      "model_release_id": "meta-llama:llama-2-70b-chat-hf:2023-07-18",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 80, "profile": "grouped_full_attention"}],
+      "known_gaps": []
+    },
+    {
+      "model_release_id": "tiiuae:falcon-180b:2023-09-06",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 80, "profile": "grouped_full_attention"}],
+      "known_gaps": ["Fixed-revision checkpoint tensor headers were not audited."]
+    },
+    {
+      "model_release_id": "mistralai:mistral-7b-instruct-v0.1:2023-09-27",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:swa", "layers": 32, "profile": "grouped_sliding_window_attention"}],
+      "known_gaps": []
+    },
+    {
+      "model_release_id": "01-ai:yi-34b-200k:2023-11-05",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 60, "profile": "grouped_full_attention"}],
+      "known_gaps": []
+    },
+    {
+      "model_release_id": "mistralai:mixtral-8x7b-instruct-v0.1:2023-12-11",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:gqa:full", "layers": 32, "profile": "grouped_full_attention"},
+        {"routed_group": "bf16_routed_swiglu_experts", "layers": 32, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["No serving routing trace."]
+    },
+    {
+      "model_release_id": "deepseek-ai:deepseek-v2-chat:2024-05-06",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "partially_supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:mla:full", "layers": 60, "profile": "mla_full_attention"},
+        {"routed_group": "bf16_routed_swiglu_experts", "layers": 59, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["The public 2024 vLLM path expands K/V; the selected result is the intended absorbed logical MLA profile.", "No serving routing trace."]
+    },
+    {
+      "model_release_id": "meta-llama:llama-3.1-405b-instruct-fp8:2024-07-23",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 126, "profile": "grouped_full_attention"}],
+      "known_gaps": ["FP32 FP8-scale traffic is excluded from per-token weight traffic."]
+    },
+    {
+      "model_release_id": "nvidia:llama-3.1-70b-instruct-fp8:2024-07-23",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 80, "profile": "grouped_full_attention"}],
+      "known_gaps": ["FP32 quantization-scale traffic is excluded from per-token weight traffic."]
+    },
+    {
+      "model_release_id": "ai21labs:jamba-1.5-large:2024-08-22",
+      "overall": {"flops": "partially_supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:gqa:full", "layers": 9, "profile": "grouped_full_attention"},
+        {"config_label": "mamba", "layers": 63, "profile": "mamba1_state"},
+        {"routed_group": "int8_top2_routed_swiglu_experts", "layers": 36, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["Mamba nonlinear FLOPs, ExpertsInt8 scale traffic and serving routing traces are unavailable."]
+    },
+    {
+      "model_release_id": "deepseek-ai:deepseek-v3:2024-12-26",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:mla:full", "layers": 61, "profile": "mla_full_attention", "overrides": {"cache_capacity": "supported"}},
+        {"routed_group": "fp8_routed_swiglu_experts", "layers": 58, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["FP8 scale traffic and serving routing traces are unavailable.", "MTP is excluded from standard Decode."]
+    },
+    {
+      "model_release_id": "meta-llama:llama-4-scout-17b-16e-instruct:2025-04-05",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "partially_supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:gqa:full", "layers": 12, "profile": "grouped_full_attention"},
+        {"config_label": "softmax_attention:gqa:chunked_block", "layers": 36, "profile": "grouped_chunked_block_attention"},
+        {"routed_group": "bf16_routed_swiglu_experts", "layers": 48, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["Completed local-block eviction is not evidenced for the selected release runtime.", "No serving routing trace."]
+    },
+    {
+      "model_release_id": "qwen:qwen3-32b-awq:2025-04-29",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [{"config_label": "softmax_attention:gqa:full", "layers": 64, "profile": "grouped_full_attention"}],
+      "known_gaps": ["AWQ scale and zero-point traffic is excluded from per-token weight traffic."]
+    },
+    {
+      "model_release_id": "moonshotai:kimi-linear-48b-a3b-instruct:2025-10-30",
+      "overall": {"flops": "partially_supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "recurrent_state", "layers": 40, "profile": "explicit_kda_state"},
+        {"config_label": "softmax_attention:mla:full", "layers": 7, "profile": "mla_full_attention", "overrides": {"cache_capacity": "supported"}},
+        {"routed_group": "bf16_routed_swiglu_experts", "layers": 26, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["KDA nonlinear FLOPs and serving routing traces are unavailable."]
+    },
+    {
+      "model_release_id": "moonshotai:kimi-k2-thinking:2025-11-06",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:mla:full", "layers": 61, "profile": "mla_full_attention", "overrides": {"cache_capacity": "supported"}},
+        {"routed_group": "int4_routed_swiglu_experts", "layers": 60, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["INT4 metadata traffic and serving routing traces are unavailable."]
+    },
+    {
+      "model_release_id": "moonshotai:kimi-k2.6:2026-04-14",
+      "overall": {"flops": "supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:mla:full", "layers": 61, "profile": "mla_full_attention", "overrides": {"cache_capacity": "supported"}},
+        {"routed_group": "int4_routed_swiglu_experts", "layers": 60, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["INT4 metadata traffic and serving routing traces are unavailable.", "Vision work is excluded from text Decode."]
+    },
+    {
+      "model_release_id": "qwen:qwen3.6-35b-a3b-fp8:2026-04-15",
+      "overall": {"flops": "partially_supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "linear_attention", "layers": 30, "profile": "gated_deltanet_state"},
+        {"config_label": "recurrent_state", "layers": 30, "profile": "short_conv_state"},
+        {"config_label": "softmax_attention:gqa:full", "layers": 10, "profile": "grouped_full_attention"},
+        {"routed_group": "fp8_routed_swiglu_experts", "layers": 40, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["Gated DeltaNet nonlinear FLOPs, FP8 scale traffic and serving routing traces are unavailable.", "Vision and MTP are excluded from text Decode."]
+    },
+    {
+      "model_release_id": "zai-org:glm-5.2-fp8:2026-06-16",
+      "overall": {"flops": "partially_supported", "logical_hbm_traffic": "partially_supported", "cache_capacity": "supported", "weight_capacity": "supported"},
+      "mechanisms": [
+        {"config_label": "softmax_attention:mla:dsa", "layers": 21, "profile": "mla_dsa"},
+        {"config_label": "softmax_attention:mla:fixed_topk", "layers": 57, "profile": "mla_shared_fixed_topk"},
+        {"routed_group": "fp8_routed_ffn_experts", "layers": 75, "profile": "moe_uniform_routing"}
+      ],
+      "known_gaps": ["Top-k sorting FLOPs, FP8 scale traffic and serving routing traces are unavailable.", "MTP is excluded from standard Decode."]
+    }
+  ]
+}
