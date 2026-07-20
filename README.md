@@ -18,6 +18,16 @@ decode 与 prefill 阶段的工作量：
   流量和容量的统一计算边界。
 - [Decode 趋势推进待办](docs/decode_trend_research_todo.md)：从样本整理到芯片指标换算的
   P0–P9 路线。
+- [P8 行业需求包络实施计划](docs/decode_trend_p8_envelope_plan.md)：冻结输入、
+  分析scope、产物和验收标准。
+- [P8 包络可视化修订计划](docs/decode_trend_p8_visualization_revision_plan.md)：
+  动态候选集合断线、固定`C=2048`横比与各模型自身上限呈现。
+- [P8 行业需求包络报告](docs/decode_trend_p8_envelope_report.md)：2022–2026YTD
+  权重、计算、logical-HBM、Cache、容量与交叉点结果。
+- [P9A 技术轨迹函数实施计划](docs/decode_trend_p9a_technology_trends_plan.md)：
+  release级特征、候选函数、回测、证据等级和验收边界。
+- [P9A 技术轨迹函数报告](docs/decode_trend_p9a_technology_trends_report.md)：
+  参数解耦、上下文、Attention三轴、MoE和位宽的正式函数与适用限制。
 - [代表模型样本清单](docs/decode_trend_sample_manifest.md)：2022–2026YTD 的20个模型及
   选择理由。
 - [字段数据字典](docs/decode_trend_data_dictionary.md)：配置、模型事实、P3审计和结果

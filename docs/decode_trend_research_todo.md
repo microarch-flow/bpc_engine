@@ -1,6 +1,8 @@
 # Decode 架构趋势研究推进待办
 
-版本：v0.1
+版本：v0.2
+
+更新时间：2026-07-20
 
 相关文档：
 
@@ -10,6 +12,11 @@
 - [Decode 趋势结果字段能力矩阵](decode_trend_field_capability_matrix.md)
 - [Decode 趋势字段数据字典](decode_trend_data_dictionary.md)
 - [P3 模型与机制支持审计](decode_trend_p3_mechanism_audit.md)
+- [P8 行业需求包络实施计划](decode_trend_p8_envelope_plan.md)
+- [P8 包络可视化修订计划](decode_trend_p8_visualization_revision_plan.md)
+- [P8 行业需求包络报告](decode_trend_p8_envelope_report.md)
+- [P9A LLM 技术轨迹函数实施计划](decode_trend_p9a_technology_trends_plan.md)
+- [P9A LLM 技术轨迹函数报告](decode_trend_p9a_technology_trends_report.md)
 - [20模型数据生成说明](../studies/decode_trend/releases/README.md)
 
 ## 1. 已确认的研究边界
@@ -40,14 +47,16 @@
 |---|---|---|
 | P0 指标合同 | 已完成 | `decode_trend_metrics.md` |
 | P1 代表模型样本清单 | 已完成 | 模型纳入规则与 `decode_trend_sample_manifest.md` |
-| P2 原始数据字典 | 字段字典已完成 | 字段级置信度与能力档位仍待补齐 |
+| P2 原始数据字典 | 核心字典已完成 | 能力控制字段与字段级置信度仍待补齐 |
 | P3 引擎机制覆盖检查 | 已完成 | 模型 × 机制 × 引擎支持矩阵 |
 | P4 统一计算协议 | 已完成 | `C/B` 网格、外推和 deployment profiles |
 | P5 小样本试算 | 已完成 | Llama 2 70B 与 GLM-5.2 端到端试算 |
-| P6 全量数据计算 | 已完成 | 可复现的20模型数据生成链 |
+| P6 全量数据计算 | 已完成 | 可复现的20模型数据与冻结发布链 |
 | P7 质量验证 | 自动验证已完成 | 哈希、归一化、容量恒等式和机制锚点 |
-| P8 三类趋势统计 | 待开始 | 包络、效率和采用趋势 |
-| P9 未来预测与芯片换算 | 待开始 | 需求分布和芯片指标包络 |
+| P8 三类趋势统计 | 进行中 | 行业需求包络v0.2已完成；效率和采用趋势待实施 |
+| P9A 技术轨迹函数 | 已完成 | 43项函数记录、3个组成轴、回测、敏感性、里程碑和共现 |
+| P9B 联合未来配置 | 待开始 | 低/中/高情景配置、联合约束与可复算验证 |
+| P9C 引擎与硬件换算 | 待开始 | Workload分布、芯片指标包络与敏感性报告 |
 
 ## 4. P1：建立代表模型样本清单
 
@@ -161,9 +170,9 @@ known_gaps
 
 ## 8. P5：小样本端到端试算
 
-- [ ] 每年先选一个结构资料较完整的模型。
+- [x] 选择Llama 2 70B与GLM-5.2作为稠密基线和现代稀疏机制的两个互补试点，替代原“每年一个”的冗余试算计划。
 - [x] 完成两个试点的原始数据录入、配置转换和引擎计算。
-- [ ] 计算已审计的当年真实部署 profile。
+- [x] 两个试点均计算已审计的当年真实部署 profile；其余模型在P6统一计算。
 - [x] 输出全部计算、流量和容量分项。
 - [x] 手工复核一个 `C/B` 点。
 - [x] 检查总参数、激活参数、权重容量和 Cache 容量是否一致。
@@ -184,14 +193,14 @@ known_gaps
 
 ## 10. P7：质量验证
 
-- [ ] 检查参数量、层数和机制层数是否闭合。
-- [ ] 检查总权重容量与位宽换算。
-- [ ] 检查完整 step 与每 Token 归一化关系。
-- [ ] 检查 Weight、KV、Index、State 分项之和。
-- [ ] 检查 Cache capacity 未混入 traffic。
-- [ ] 检查 `C=0`、小 `C`、机制饱和点和最大 `C`。
-- [ ] 为主要机制建立数值锚点。
-- [ ] 输出异常、估算和缺失值清单。
+- [x] 检查参数量、层数和机制层数是否闭合。
+- [x] 检查总权重容量与位宽换算。
+- [x] 检查完整 step 与每 Token 归一化关系。
+- [x] 检查 Weight、KV、Index、State 分项之和。
+- [x] 检查 Cache capacity 未混入 traffic。
+- [x] 检查 `C=0`、小 `C`、机制饱和点和最大 `C`。
+- [x] 为主要机制建立数值锚点。
+- [x] 输出异常、估算和缺失值清单；由验证报告、P3状态和known gaps共同承载。
 
 验收标准：核心指标能复算，所有估算和外推均有显式标记。
 
@@ -199,9 +208,11 @@ known_gaps
 
 ### 行业需求包络
 
-- [ ] 使用当年真实模型、真实精度和原生能力边界。
-- [ ] 统计年度最大值、P90 或前沿区间。
-- [ ] 分析总权重、Cache、FLOPs/token 和 Bytes/token 的绝对变化。
+- [x] 使用release-specific模型、证据化部署精度profile和advertised-native边界。
+- [x] 输出年度inclusive最大值、supported-only最大值、范围和预先指定的前沿样本；
+  年度样本仅3–5个，不报告不可靠的P90。
+- [x] 分析总权重、Cache、FLOPs/token、logical-HBM Bytes/token、
+  persistent容量和主导项交叉。
 
 ### 算法效率趋势
 
@@ -218,20 +229,70 @@ known_gaps
 
 验收标准：三类趋势分别输出，不能合并成一条含义不清的年度曲线。
 
-## 12. P9：未来预测与芯片指标换算
+## 12. P9：技术轨迹、未来配置与芯片指标换算
 
-- [ ] 预测未来模型配置和 workload 分布，而不是单一模型名称。
-- [ ] 输出 FLOPs/token、Bytes/token 和 Capacity 的 P10/P50/P90。
+### P9A：技术轨迹函数
+
+- [x] 以release/profile为统计单位提取参数、上下文、Attention三轴、MoE和位宽特征。
+- [x] 比较常数与低维趋势函数，执行完整年度滚动回测和留组敏感性分析。
+- [x] 输出43项正式函数记录、3个组成轴摘要、证据等级、里程碑、共现表和10组PNG/SVG。
+- [x] 明确精选样本出现率不是行业采用率，2026YTD不进入完整年度回测。
+- [x] 强制参数基与MoE两部分模型的声明内恒等式；跨技术轴联合约束留给P9B。
+
+实施与结论分别见
+[P9A计划](decode_trend_p9a_technology_trends_plan.md)和
+[P9A报告](decode_trend_p9a_technology_trends_report.md)。
+
+### P9B：联合未来模型配置
+
+- [ ] 先编写P9B实施计划，明确primitive、diagnostic、条件分支和验收标准。
+- [ ] 把P9A边际函数组合成低/中/高情景，而不是单一模型名称。
+- [ ] 保留P9A的参数/MoE声明内恒等式和三个轴内组成闭合，并新增跨技术轴联合约束。
+- [ ] 对上下文、MoE、精度和机制共现施加可解释的联合约束。
+- [ ] 区分历史拟合、两年条件外推和更远期speculative情景。
+- [ ] 输出机器可读的情景配置、来源函数与假设清单、约束验证结果和解释报告。
+- [ ] 验证每个情景均可被当前引擎解析，且不会把互斥技术或诊断函数直接拼接。
+
+### P9C：引擎计算与芯片换算
+
+- [ ] 只接收通过P9B约束验证的联合情景，不直接消费独立边际函数。
+- [ ] 输出 FLOPs/token、Bytes/token 和 Capacity 的情景分布。
 - [ ] 给定目标 Decode Token/s 和并发数。
 - [ ] 换算 Peak Compute、Peak HBM Bandwidth 和 HBM Capacity。
 - [ ] 计算所需 Bandwidth/Compute。
 - [ ] 分析哪些结论对模型采用率、上下文和精度假设敏感。
 - [ ] 在进入真实芯片设计前补充利用率、功耗、面积和通信模型。
+- [ ] 输出公式、输入假设、结果表、图表和结论解释文档，保持可复算追溯。
 
 ## 13. 当前行动
 
 当前数据准备阶段已经形成可复现的正式数据生成链：
 
-> 20模型数据可通过冻结脚本生成3357行结果、字段字典快照、P3状态、来源快照和SHA-256。生成目录不提交Git。
+> 已于2026-07-20从干净提交`4ca035f`生成本地正式版本`v1.0.0`：20个模型、3357行结果、1440行显式外推、完整来源快照和SHA-256，验证状态为`pass`。版本目录由Git忽略，不提交仓库。
 
-进入P8前仍需明确`partially_supported`数据是进入中心拟合还是只进入敏感性分析，并补充模型能力控制字段。
+该版本在两个`C=16M、B=256`极端外推点报告IEEE-754整数精度警告，涉及BLOOM 176B和GLM-130B的batch cache；进入统计时应保留警告标记。
+
+P8行业需求包络v0.2已按[实施计划](decode_trend_p8_envelope_plan.md)和
+[可视化修订计划](decode_trend_p8_visualization_revision_plan.md)完成，正式解释见
+[结果报告](decode_trend_p8_envelope_report.md)。分析保留`partially_supported`
+数据并逐指标标记，同时输出supported-only年度最大值；没有把partial状态静默视为
+完整支持。可复现表格和图表默认生成到`/tmp/decode_trend_p8_envelope/`。
+
+P9A已按[实施计划](decode_trend_p9a_technology_trends_plan.md)完成，正式解释见
+[结果报告](decode_trend_p9a_technology_trends_report.md)。20个release生成43项
+函数记录和3个组成轴；按记录行计为11项`emerging`、17项`unstable`、15项
+`insufficient`，没有`established`结论。真正的趋势证据单位是6条非组成趋势记录
+和1个通过回测的KV-layout组成轴，另有4条代数派生函数；不能把函数行数解释成独立
+发现数。可复现产物默认写入
+`/tmp/decode_trend_p9a_technology_trends/`。
+
+若继续未来预测，下一步是P9B联合配置约束，不能直接把独立边际函数拼成一台未来
+模型。P8算法效率仍需先补能力/质量控制字段，再使用统一精度和统一`C/B`实施；
+部署采用趋势仍需另行收集部署量或Token份额。
+
+后续优先级固定为：
+
+1. 编写P9B实施计划并冻结联合情景合同；
+2. 生成低/中/高情景配置、约束验证和解释报告；
+3. P9B验收后实施P9C workload与芯片指标换算；
+4. P2能力字段、P8算法效率和部署采用数据作为并行数据补强，不阻塞P9B情景方法设计。
