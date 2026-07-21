@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "DeepSeek-V2-Chat RL native BF16 weight + logical absorbed BF16 MLA-KV deployment",
+    "max_context_tokens": 131072,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_mla_projections",
+          "parameters": 8953528320,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_dense_layer0_swiglu",
+          "parameters": 188743680,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_shared_swiglu_experts",
+          "parameters": 2783969280,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 48332800,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 524288000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "bf16_routed_swiglu_experts",
+          "layers": 59,
+          "expert_count": 160,
+          "selected_per_token": 6,
+          "parameters_per_expert": 23592960,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 16
+        }
+      ],
+      "weight_bits": 16,
+      "output_head_parameters": 524288000,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "60 full-context MLA layers",
+        "layers": 60,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 128,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 16,
+              "rope_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 10240
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "architecture_evolution_contrast",
+      "release_date": "2024-05-06",
+      "checkpoint": "deepseek-ai/DeepSeek-V2-Chat",
+      "checkpoint_variant": "RL-aligned chat checkpoint",
+      "checkpoint_revision": "8e3f5f6c2226787e41ba3e9283a06389d178c926",
+      "architecture_summary": "Sparse MoE causal decoder-only Transformer with 60 MLA layers, one dense SwiGLU layer followed by 59 DeepSeekMoE layers, 160 routed experts with group-limited top-6 routing plus two always-active shared experts per MoE layer, YaRN-scaled RoPE, pre-RMSNorm, and untied input embedding and LM head.",
+      "sources": {
+        "official_release": "https://github.com/deepseek-ai/DeepSeek-V2",
+        "technical_report": "https://arxiv.org/abs/2405.04434",
+        "pinned_checkpoint_tree": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Chat/tree/8e3f5f6c2226787e41ba3e9283a06389d178c926",
+        "pinned_model_card": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Chat/blob/8e3f5f6c2226787e41ba3e9283a06389d178c926/README.md",
+        "pinned_checkpoint_config": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Chat/blob/8e3f5f6c2226787e41ba3e9283a06389d178c926/config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Chat/blob/8e3f5f6c2226787e41ba3e9283a06389d178c926/model.safetensors.index.json",
+        "pinned_reference_implementation": "https://huggingface.co/deepseek-ai/DeepSeek-V2-Chat/blob/8e3f5f6c2226787e41ba3e9283a06389d178c926/modeling_deepseek.py",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/deepseek-ai/DeepSeek-V2-Chat/revision/8e3f5f6c2226787e41ba3e9283a06389d178c926",
+        "public_2024_vllm_reference_integration": "https://github.com/vllm-project/vllm/pull/4650"
+      },
+      "architecture": {
+        "hidden_size": 5120,
+        "layers": 60,
+        "vocab_size": 102400,
+        "query_heads": 128,
+        "query_lora_rank": 1536,
+        "kv_lora_rank": 512,
+        "qk_nope_head_dim": 128,
+        "qk_rope_head_dim": 64,
+        "value_head_dim": 128,
+        "dense_first_layers": 1,
+        "dense_intermediate_size": 12288,
+        "moe_layers": 59,
+        "moe_intermediate_size_per_expert": 1536,
+        "routed_experts_per_layer": 160,
+        "selected_routed_experts_per_token": 6,
+        "expert_groups": 8,
+        "selected_expert_groups_per_token": 3,
+        "shared_experts_per_layer": 2,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "position_encoding": "RoPE with YaRN scaling",
+        "rope_theta": 10000,
+        "rope_scaling": {
+          "type": "yarn",
+          "factor": 40,
+          "original_max_position_embeddings": 4096,
+          "config_max_position_embeddings": 163840
+        },
+        "published_context_tokens": 131072,
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.000001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "sparse_moe": true,
+        "routing_method": "group_limited_greedy",
+        "normalize_topk_probability": false,
+        "routed_scaling_factor": 16.0
+      },
+      "reported_total_parameters": {
+        "value": 236,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "reported_active_parameters": {
+        "value": 21,
+        "unit": "billion_parameters",
+        "precision": "official_rounded; no exact official counting formula published"
+      },
+      "parameter_breakdown": {
+        "one_layer_mla_projection_matrices": 149225472,
+        "all_mla_projection_matrices": 8953528320,
+        "dense_layer0_swiglu": 188743680,
+        "one_routed_expert_in_one_layer": 23592960,
+        "all_routed_experts": 222717542400,
+        "active_routed_experts_per_token": 8351907840,
+        "two_shared_experts_in_one_moe_layer": 47185920,
+        "all_shared_experts": 2783969280,
+        "one_moe_router": 819200,
+        "all_moe_routers": 48332800,
+        "untied_lm_head": 524288000,
+        "engine_always_active_matrix_parameters": 12498862080,
+        "engine_active_matrix_parameters_per_token": 20850769920,
+        "engine_all_resident_matrix_groups": 235216404480,
+        "untied_input_embedding_parameter_elements": 524288000,
+        "all_unique_matrix_parameters": 235740692480,
+        "rmsnorm_parameters": 742400,
+        "exact_total_parameter_elements": 235741434880
+      },
+      "weight_capacity": {
+        "bf16_trainable_weight_payload_bytes": 471482869760,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_bf16_profile",
+        "total_weight_capacity_bytes": 471482869760,
+        "capacity_note": "The exact payload equals 235741434880 BF16 parameter elements times two bytes and matches the pinned safetensors index total_size. It includes all 160 experts in every MoE layer, both untied embedding/head matrices, routers, and RMSNorm weights. The input embedding is capacity-only metadata because Decode reads one BF16 embedding row per request."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 41701539840,
+        "matrix_weight_payload_read_bytes_at_batch1": 41701539840,
+        "attention_flops_per_token_coefficient_times_context": 16711680,
+        "mla_kv_bytes_per_historical_token_per_layer": 1152,
+        "mla_kv_bytes_per_historical_token_all_layers": 69120,
+        "mla_kv_capacity_bytes_per_request_at_published_max_context": 9059696640
+      },
+      "parameter_count_convention": "The engine counts all MLA projection matrices, the dense layer-0 SwiGLU, all routers and shared experts, six routed experts in each of 59 MoE layers, and the complete untied LM head for one Decode token. This gives 20850769920 active matrix elements, which rounds consistently with but must not be replaced by the official 21B label. The separate input embedding contributes one row read rather than a full matrix multiply. RMSNorm, RoPE, softmax, routing selection, expert output weighting, and other elementwise work are outside matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "official_2024_native_bfloat16_checkpoint_inference",
+        "weight_dtype": "bfloat16",
+        "activation_dtype": "bfloat16 with implementation-specific higher-precision operations",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The official checkpoint API reports exactly 235741434880 BF16 parameter elements, and the pinned safetensors payload is exactly twice that element count.",
+        "kv_precision_evidence": "The official model card specifies BF16 inference and does not publish a 2024 KV-quantization override. This profile therefore retains the logical compressed latent and RoPE cache in BF16.",
+        "router_precision_note": "The pinned reference implementation casts router scores and stored router weights to FP32 for routing arithmetic. The engine records the persisted BF16 router payload; it does not model operator compute dtypes or temporary casts.",
+        "quantization_metadata": "not_applicable_to_native_bf16_profile"
+      },
+      "context_note": "The official release advertises and evaluates 128K context, so max_context_tokens is 131072. The checkpoint config's max_position_embeddings=163840 is the YaRN-scaled internal position limit and is not treated as a separately demonstrated service context.",
+      "mla_note": "The configuration models the paper's intended absorbed MLA deployment: every layer retains one 512-element compressed KV latent plus one 64-element decoupled RoPE key per historical token. The cited 2024 public vLLM reference integration instead expands and pads K/V for its generic attention cache; it proves a public serving path but not this physical compressed-cache layout. Its expanded cache and implementation temporaries are outside this logical architecture baseline.",
+      "public_vllm_boundary": "vLLM PR 4650 expands per-head K/V and pads head size 192 to 256 before calling the generic attention cache. Do not compare a physical run of that public reference path directly with this absorbed-MLA KV result. The compressed state and reported 93.3% KV reduction come from the model architecture and technical report's optimized inference path.",
+      "routing_note": "The real model first selects three of eight expert groups and then six of 160 routed experts. With no serving routing trace, batch expert traffic uses the engine's uniform-independent union estimate. It is an analytical approximation and does not reproduce group constraints, token correlations, load balancing, or expert-parallel placement.",
+      "active_parameter_note": "The official 236B and 21B figures are rounded and the report does not publish an exact active-parameter formula. The exact engine value 20.850769920B counts executed matrices; adding full embedding capacity or using the rounded 21B as work would change the boundary.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both 102400-by-5120 BF16 matrices. Decode reads one 5120-element BF16 input row per request, while the full LM head is read once per scheduler step and amortized across the batch.",
+      "implementation_note": "The logical-superchip baseline excludes expert-routing dispatch, tensor/expert-parallel communication, kernel padding, temporary activations, softmax traffic, and internal workspace materialization."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "dataset_release_schema_version": 1,
+  "dataset_version": "v1.0.0",
+  "study_id": "decode-trend-2022-2026ytd-v1",
+  "created_at_utc": "2026-07-20T02:19:55Z",
+  "phase": "decode",
+  "model_count": 20,
+  "row_count": 3357,
+  "source_repository": {
+    "git_commit": "4ca035f4ca66ab4c4917db678bf0b2792346c9ce",
+    "git_worktree_dirty": false
+  },
+  "frozen_inputs": {
+    "model_manifest": "source_snapshot/studies/decode_trend/models.json",
+    "mechanism_audit": "source_snapshot/studies/decode_trend/mechanism_audit.json",
+    "runner": "source_snapshot/scripts/run_decode_trend.py",
+    "engine": "source_snapshot/decode_engine/",
+    "data_dictionary": "source_snapshot/docs/decode_trend_data_dictionary.md",
+    "metric_contract": "source_snapshot/docs/decode_trend_metrics.md",
+    "p3_human_audit": "source_snapshot/docs/decode_trend_p3_mechanism_audit.md"
+  },
+  "canonical_data": {
+    "csv": "data/decode_results.csv",
+    "jsonl": "data/decode_results.jsonl",
+    "model_profiles": "data/model_profiles.jsonl",
+    "run_manifest": "data/run_manifest.json",
+    "validation_report": "data/validation_report.json"
+  },
+  "validation": {
+    "status": "pass",
+    "run_id": "decode-trend-2022-2026ytd-v1-20260720T021944Z",
+    "model_count": 20,
+    "row_count": 3357,
+    "checks": {
+      "rows_checked": 3357,
+      "extrapolated_rows": 1440
+    },
+    "warning_count": 2,
+    "warnings": [
+      "bigscience:bloom-176b:2022-07-12 C=16777216 B=256 batch_cache_bytes exceeds exact IEEE-754 integer range",
+      "zai-org:glm-130b-int4:2022-08-24 C=16777216 B=256 batch_cache_bytes exceeds exact IEEE-754 integer range"
+    ]
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Llama 4 Scout 17B-16E Instruct native BF16 weight+KV full-retention deployment",
+    "max_context_tokens": 10485760,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_gqa_projections",
+          "parameters": 3019898880,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_shared_swiglu_experts",
+          "parameters": 6039797760,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 3932160,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 1034485760,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "bf16_routed_swiglu_experts",
+          "layers": 48,
+          "expert_count": 16,
+          "selected_per_token": 1,
+          "parameters_per_expert": 125829120,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 16
+        }
+      ],
+      "weight_bits": 16,
+      "output_head_parameters": 1034485760,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "12 full-context NoPE GQA layers",
+        "layers": 12,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 40,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "36 fixed-8K-chunk RoPE GQA layers with release-time full KV retention",
+        "layers": 36,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 40,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "chunked_block",
+              "chunk_tokens": 8192,
+              "retain_full_history": true
+            }
+          }
+        ]
+      },
+      {
+        "name": "BF16 input embedding row lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 10240
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "conditional_efficiency_comparison_and_mechanism_anchor",
+      "positive_trend_uses": [
+        "total-versus-active MoE parameter decoupling",
+        "deployed hybrid full-context and fixed-block local attention workload"
+      ],
+      "excluded_positive_trend_uses": [
+        "2025 frontier capability envelope",
+        "10M as a task-independent effective-context observation"
+      ],
+      "release_date": "2025-04-05",
+      "checkpoint": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "checkpoint_variant": "instruction-tuned multimodal release; text-only Decode after prompt processing",
+      "checkpoint_revision": "63bc3b67bc6e8f6857e7819c1218c8f18474f04a",
+      "checkpoint_revision_note": "This 2025-04-09 post-launch revision retains the release BF16 weights and fixes the launch config's RoPE scaling values. The chronology remains the 2025-04-05 release; using the uncorrected config would not faithfully instantiate the intended model.",
+      "architecture_summary": "Native-multimodal sparse MoE causal decoder with a 48-layer text backbone. Every text layer has 16 routed SwiGLU experts with top-1 routing plus one always-active shared expert. Attention is GQA with 40 query heads, 8 KV heads and head dimension 128: three of every four layers use RoPE and fixed non-overlapping 8K chunk attention, while every fourth layer is a full-context NoPE layer with attention-temperature tuning. The selected release-time BF16 serving profile retains full historical KV for all 48 layers even though 36 layers read only the current fixed block.",
+      "sources": {
+        "official_release": "https://ai.meta.com/blog/llama-4-multimodal-intelligence/",
+        "official_model_card": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct-Original/blob/main/README.md",
+        "pinned_checkpoint_tree": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct/tree/63bc3b67bc6e8f6857e7819c1218c8f18474f04a",
+        "pinned_checkpoint_config": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct/blob/63bc3b67bc6e8f6857e7819c1218c8f18474f04a/config.json",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/meta-llama/Llama-4-Scout-17B-16E-Instruct/revision/63bc3b67bc6e8f6857e7819c1218c8f18474f04a?expand[]=config&expand[]=safetensors&expand[]=sha&expand[]=createdAt",
+        "launch_config_correction": "https://huggingface.co/meta-llama/Llama-4-Scout-17B-16E-Instruct/discussions/51",
+        "huggingface_release_architecture": "https://github.com/huggingface/blog/blob/main/llama4-release.md",
+        "transformers_4_51_text_implementation": "https://github.com/huggingface/transformers/blob/v4.51.0/src/transformers/models/llama4/modeling_llama4.py",
+        "transformers_4_51_configuration": "https://github.com/huggingface/transformers/blob/v4.51.0/src/transformers/models/llama4/configuration_llama4.py",
+        "vllm_0_8_3_release_deployment": "https://github.com/vllm-project/vllm/pull/16104",
+        "aws_bedrock_2025_deployment": "https://aws.amazon.com/blogs/aws/llama-4-models-from-meta-now-available-in-amazon-bedrock-serverless/",
+        "nolima_independent_long_context": "https://github.com/adobe-research/NoLiMa",
+        "stanford_helm_long_context": "https://crfm.stanford.edu/2025/09/29/helm-long-context.html"
+      },
+      "architecture": {
+        "text_hidden_size": 5120,
+        "text_layers": 48,
+        "vocab_size": 202048,
+        "query_heads": 40,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "attention_projection_bias": false,
+        "rope_chunked_layers": 36,
+        "nope_full_context_layers": 12,
+        "attention_chunk_tokens": 8192,
+        "use_qk_norm_on_rope_layers": true,
+        "qk_norm_has_learnable_parameters": false,
+        "attention_temperature_tuning_on_nope_layers": true,
+        "attention_temperature_floor_scale": 8192,
+        "attention_temperature_scale": 0.1,
+        "moe_layers": 48,
+        "routed_experts_per_layer": 16,
+        "selected_routed_experts_per_token": 1,
+        "shared_experts_per_layer": 1,
+        "routed_and_shared_expert_intermediate_size": 8192,
+        "activation": "SwiGLU",
+        "routing_score_function": "sigmoid after top-1 selection",
+        "position_encoding": "iRoPE: interleaved RoPE chunked layers and NoPE full-context layers",
+        "rope_theta": 500000,
+        "rope_scaling": {
+          "type": "llama3",
+          "factor": 16,
+          "original_max_position_embeddings": 8192
+        },
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "sparse_moe": true,
+        "native_multimodal": true
+      },
+      "reported_total_parameters": {
+        "value": 109,
+        "unit": "billion_parameters",
+        "precision": "official_rounded_full_multimodal_checkpoint"
+      },
+      "reported_active_parameters": {
+        "value": 17,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "parameter_breakdown": {
+        "one_layer_gqa_projection_matrices": 62914560,
+        "all_gqa_projection_matrices": 3019898880,
+        "one_routed_or_shared_expert_in_one_layer": 125829120,
+        "all_shared_experts": 6039797760,
+        "all_routed_experts": 96636764160,
+        "active_routed_experts_per_token": 6039797760,
+        "one_moe_router": 81920,
+        "all_moe_routers": 3932160,
+        "untied_input_embedding": 1034485760,
+        "untied_lm_head": 1034485760,
+        "text_rmsnorm_parameters": 496640,
+        "engine_always_active_matrix_parameters": 10098114560,
+        "engine_active_matrix_parameters_per_token": 16137912320,
+        "engine_all_resident_text_matrix_groups": 106734878720,
+        "exact_text_backbone_parameter_elements": 107769861120,
+        "vision_encoder_and_multimodal_projector_elements": 871932416,
+        "exact_full_multimodal_checkpoint_parameter_elements": 108641793536
+      },
+      "weight_capacity": {
+        "text_backbone_bf16_payload_bytes": 215539722240,
+        "vision_encoder_and_multimodal_projector_bf16_payload_bytes": 1743864832,
+        "total_bf16_checkpoint_capacity_bytes": 217283587072,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_bf16_profile",
+        "capacity_note": "The pinned API reports exactly 108641793536 BF16 parameter elements. The complete multimodal checkpoint is resident capacity for the selected service, but the vision encoder and multimodal projector run only while processing image inputs and are excluded from steady-state text Decode FLOPs and weight traffic."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 32275824640,
+        "matrix_weight_payload_read_bytes_at_batch1": 32275824640,
+        "input_embedding_row_read_bytes_per_token": 10240,
+        "gqa_kv_bytes_per_historical_token_per_layer": 4096,
+        "gqa_kv_write_bytes_per_decode_token_all_layers": 196608,
+        "full_context_attention_flops_coefficient_times_context": 245760,
+        "chunked_attention_flops_coefficient_times_chunk_phase": 737280,
+        "chunk_phase_definition": "context_tokens modulo 8192",
+        "full_retention_kv_capacity_bytes_per_request_at_trained_256k": 51539607552,
+        "full_retention_kv_capacity_bytes_per_request_at_aws_3_5m": 688128000000,
+        "full_retention_kv_capacity_bytes_per_request_at_advertised_10m": 2061584302080,
+        "kv_read_bytes_per_token_at_aws_3_5m": 172329271296,
+        "total_flops_per_token_at_aws_3_5m_batch1": 893922181120,
+        "total_bytes_per_token_at_aws_3_5m_batch1": 204605302784,
+        "optimized_current_chunk_only_kv_capacity_at_advertised_10m_if_supported": 516604035072,
+        "selected_deployment_uses_optimized_current_chunk_only_retention": false
+      },
+      "parameter_count_convention": "The engine executes all 48 GQA projection sets, all 48 routers and shared experts, one routed expert in each layer, and the complete untied LM head for one Decode token. This gives 16137912320 active matrix elements. The official rounded 17B label also reflects a broader active-capacity convention; it must not replace the exact engine matrix path. The input embedding contributes one 5120-element BF16 row read. RMSNorm, parameter-free QK normalization, RoPE, attention-temperature scaling, softmax, sigmoid, routing selection, expert weighting, and sampling are outside matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "official_2025_native_bfloat16_weights_and_release_time_bfloat16_full_retention_kv",
+        "weight_dtype": "bfloat16",
+        "activation_dtype": "bfloat16 with implementation-specific FP32 accumulation for selected normalization and softmax operations",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "expert_weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "Scout was released as BF16 weights, the pinned API reports every checkpoint parameter as BF16, and all official quality evaluations use BF16.",
+        "kv_precision_evidence": "The vLLM 0.8.3 launch recipe serves the unquantized checkpoint without a KV dtype override. With model dtype BF16 and kv_cache_dtype=auto, the selected cache profile is BF16. This is configuration-and-runtime-default evidence, not a direct model-card declaration.",
+        "alternative_int4_note": "Meta supplies an on-the-fly INT4 path that can fit Scout on one H100, but the public official benchmark table is BF16 and does not publish an exact INT4 quality delta. INT4 is therefore retained as a deployment variant, not substituted for this auditable primary profile.",
+        "quantization_metadata": "not_applicable_to_native_bf16_profile"
+      },
+      "context_profile": {
+        "advertised_max_context_tokens_at_release": 10485760,
+        "trained_context_tokens": 262144,
+        "official_long_context_evidence": "single-needle retrieval and cumulative code NLL length generalization",
+        "vllm_0_8_3_h100_deployed_max_context_tokens": 1280000,
+        "vllm_0_8_3_h200_deployed_max_context_tokens": 3600000,
+        "aws_bedrock_2025_deployed_max_context_tokens": 3500000,
+        "nolima_effective_context_tokens_at_85_percent_of_short_baseline": 1024,
+        "nolima_tested_max_context_tokens_for_scout": 32768,
+        "helm_2025_tested_max_context_tokens": 131072,
+        "effective_context_policy": "Task- and threshold-specific curves are stored as evidence; no single task-independent effective context is assigned.",
+        "trend_policy": "10M is an advertised/loadable architectural ceiling and sensitivity point. It must not enter the positive effective-context trend or central chip-capacity fit. The 3.5M AWS value is a production service limit, not evidence of task quality at 3.5M."
+      },
+      "capability_gate": {
+        "result": "conditional_pass_for_architecture_efficiency_not_frontier",
+        "official_bf16_mmlu_pro": 74.3,
+        "official_bf16_gpqa_diamond": 57.2,
+        "official_bf16_livecodebench": 32.8,
+        "comparison_note": "Official results place Scout near or somewhat above Llama 3.3 70B on knowledge and reasoning, while coding is essentially tied. Independent evaluations support a mature-mainstream capability floor but not a 2025 frontier position."
+      },
+      "long_context_effect_gate": {
+        "result": "fail_for_10m_as_verified_effective_context",
+        "nolima_short_context_base_score": 81.7,
+        "nolima_85_percent_threshold": 69.4,
+        "nolima_scores": {
+          "1k": 72.3,
+          "2k": 61.8,
+          "4k": 50.8,
+          "8k": 35.5,
+          "16k": 26.9,
+          "32k": 21.6
+        },
+        "boundary_note": "NoLiMa removes literal question-needle overlap and finds an effective length of 1K under its own threshold. This demonstrates early semantic-retrieval degradation but does not prove failure on every long-context task or directly evaluate a 10M prompt."
+      },
+      "chunked_attention_note": "The 36 RoPE layers use fixed non-overlapping 8192-token blocks, not a sliding window. For Decode at context C, each such layer reads C modulo 8192 historical entries. Consequently the local-layer workload is phase-dependent and resets at block boundaries; scans should include both a boundary and a just-before-boundary point instead of fitting a smooth SWA curve.",
+      "cache_retention_note": "The selected 2025 BF16 runtime profile conservatively retains full historical KV in all 48 layers while masking reads in the 36 chunked layers. The vLLM 1.28M-on-8xH100 and 3.6M-on-8xH200 capacity envelopes are consistent with this full-retention profile. A later runtime that evicts completed local blocks is a distinct deployment profile and must set retain_full_history=false.",
+      "routing_note": "No public serving routing trace is available. Batch expert traffic therefore uses the engine's uniform-independent union estimate for top-1 selection over 16 experts. It does not reproduce token correlation, expert placement, dispatch, or expert-parallel communication.",
+      "multimodal_decode_boundary": "The vision encoder and multimodal projector may run during prompt processing when images are present. They do not run for each subsequent text Decode token, so their parameters remain in full checkpoint capacity metadata but do not enter steady-state Decode FLOPs or traffic.",
+      "implementation_note": "The logical-superchip baseline excludes tensor/expert-parallel communication, expert dispatch, fused-kernel padding, temporary activations, KV block metadata, allocator fragmentation, framework workspace, and measured latency."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      2048,
+      8191,
+      8192,
+      131072,
+      262144,
+      1000000,
+      3500000,
+      10485760
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

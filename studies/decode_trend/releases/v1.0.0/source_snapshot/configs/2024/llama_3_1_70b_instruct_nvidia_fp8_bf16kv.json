@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Llama 3.1 70B Instruct NVIDIA ModelOpt FP8 weight + BF16 KV deployment",
+    "max_context_tokens": 131072,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "fp8_all_80_layer_gqa_projections",
+          "parameters": 12079595520,
+          "weight_bits": 8
+        },
+        {
+          "name": "fp8_all_80_layer_swiglu_ffn",
+          "parameters": 56371445760,
+          "weight_bits": 8
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 1050673152,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 8,
+      "output_head_parameters": 1050673152,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "80 full-context GQA layers",
+        "layers": 80,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 64,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 16384
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "mainstream_deployment",
+      "release_date": "2024-07-23",
+      "deployment_checkpoint_release_date": "2024-08-29",
+      "base_checkpoint": "meta-llama/Llama-3.1-70B-Instruct",
+      "checkpoint": "nvidia/Llama-3.1-70B-Instruct-FP8",
+      "checkpoint_revision": "811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e",
+      "deployment_documentation_revision": "57d2a4b129544a41f766589825dd2e70089bf6b0",
+      "architecture_summary": "Dense causal decoder-only Transformer with 80 SwiGLU layers, 128K full-context GQA, Llama 3 RoPE scaling, pre-RMSNorm, and untied input embedding and LM head. NVIDIA ModelOpt quantizes all seven Linear operators in every Transformer block to W8A8 FP8; embedding, LM head, RMSNorm, and persistent KV remain BF16.",
+      "sources": {
+        "official_release": "https://ai.meta.com/blog/meta-llama-3-1/",
+        "official_model_card": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/MODEL_CARD.md",
+        "technical_report": "https://arxiv.org/abs/2407.21783",
+        "base_checkpoint": "https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct",
+        "pinned_nvidia_fp8_checkpoint_tree": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/tree/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e",
+        "checkpoint_repository_version_history": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/commits/main",
+        "nvidia_fp8_checkpoint_commit": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/commit/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e",
+        "pinned_checkpoint_config": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/blob/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e/config.json",
+        "pinned_quantization_config": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/blob/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e/hf_quant_config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/blob/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e/model.safetensors.index.json",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/nvidia/Llama-3.1-70B-Instruct-FP8/revision/811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e",
+        "pinned_2024_deployment_model_card": "https://huggingface.co/nvidia/Llama-3.1-70B-Instruct-FP8/blob/57d2a4b129544a41f766589825dd2e70089bf6b0/README.md",
+        "vllm_0_6_3_engine_arguments": "https://docs.vllm.ai/en/v0.6.3.post1/models/engine_args.html",
+        "nvidia_nim_1_1_models": "https://docs.nvidia.com/nim/large-language-models/1.1.0/models.html",
+        "nvidia_nim_1_1_support_matrix": "https://docs.nvidia.com/nim/large-language-models/1.1.0/support-matrix.html",
+        "meta_2024_adoption_report": "https://ai.meta.com/blog/llama-usage-doubled-may-through-july-2024/"
+      },
+      "architecture": {
+        "hidden_size": 8192,
+        "intermediate_size": 28672,
+        "layers": 80,
+        "query_heads": 64,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 128256,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "position_encoding": "RoPE",
+        "rope_theta": 500000,
+        "rope_scaling": {
+          "rope_type": "llama3",
+          "factor": 8.0,
+          "original_max_position_embeddings": 8192,
+          "low_freq_factor": 1.0,
+          "high_freq_factor": 4.0
+        },
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 70,
+        "unit": "billion_parameters",
+        "precision": "rounded_model_name"
+      },
+      "parameter_breakdown": {
+        "one_layer_attention_projections": 150994944,
+        "all_attention_projections": 12079595520,
+        "one_layer_swiglu_ffn": 704643072,
+        "all_swiglu_ffn": 56371445760,
+        "fp8_transformer_block_linear_weights": 68451041280,
+        "bf16_untied_lm_head": 1050673152,
+        "engine_matrix_parameters": 69501714432,
+        "bf16_untied_input_embedding_capacity_only": 1050673152,
+        "all_unique_matrix_parameters": 70552387584,
+        "bf16_rmsnorm_parameters": 1318912,
+        "exact_trainable_parameter_elements": 70553706496,
+        "checkpoint_fp8_weight_elements": 68451041280,
+        "checkpoint_bf16_trainable_elements": 2102665216
+      },
+      "weight_capacity": {
+        "fp8_trainable_weight_payload_bytes": 68451041280,
+        "bf16_trainable_weight_payload_bytes": 4205330432,
+        "weight_payload_bytes": 72656371712,
+        "fp32_weight_scale_elements": 560,
+        "fp32_input_activation_scale_elements": 560,
+        "quantization_metadata_elements": 1120,
+        "quantization_metadata_dtype": "float32_scalar",
+        "quantization_metadata_bytes": 4480,
+        "quantization_metadata_status": "included_in_capacity_separately_from_weight_payload",
+        "total_weight_capacity_bytes": 72656376192,
+        "capacity_note": "Capacity contains every trainable tensor plus one scalar FP32 weight_scale and one scalar FP32 input_scale for each of the 560 quantized Transformer-block Linear operators. The total exactly matches the pinned safetensors index total_size; tokenizer files and serialization/container headers are excluded."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 139003428864,
+        "fp8_transformer_block_linear_flops_per_token": 136902082560,
+        "bf16_lm_head_flops_per_token": 2101346304,
+        "matrix_weight_payload_read_bytes_per_decode_step": 70552387584,
+        "fp32_static_scale_bytes_per_decode_step_if_streamed_once": 4480,
+        "matrix_weight_plus_scale_bytes_per_decode_step_if_streamed_once": 70552392064,
+        "scale_traffic_engine_status": "excluded_from_engine_result",
+        "attention_flops_per_token_coefficient_times_context": 2621440,
+        "kv_bytes_per_historical_token_per_request": 327680,
+        "kv_capacity_bytes_per_request_at_max_context": 42949672960
+      },
+      "parameter_count_convention": "The engine counts all Q/K/V/O and SwiGLU projection matrices plus the complete untied LM head for each Decode token. The separate input embedding is resident capacity but Decode reads only one 8192-element BF16 row per request. RMSNorm, RoPE, FP8 quantize/dequantize operations, softmax, and other elementwise work do not enter matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "nvidia_2024_modelopt_w8a8_fp8_transformer_linears_bf16_kv",
+        "checkpoint_quantization_algorithm": "FP8",
+        "quantized_linear_operators_per_layer": 7,
+        "quantized_linear_operator_count": 560,
+        "transformer_block_linear_weight_dtype": "float8_e4m3",
+        "transformer_block_linear_activation_dtype": "float8",
+        "quantization_granularity": "one scalar scale per tensor per Linear input or weight",
+        "weight_scale_dtype": "float32",
+        "input_activation_scale_dtype": "float32",
+        "embedding_head_norm_dtype": "bfloat16",
+        "kv_cache_quant_algo": null,
+        "kv_dtype": "bfloat16",
+        "selected_runtime_path": "The pinned NVIDIA 2024 vLLM example with dtype=auto and default kv_cache_dtype=auto; no FP8-KV override.",
+        "weight_precision_evidence": "The pinned checkpoint contains exactly 68451041280 F8_E4M3 elements, equal to every Q/K/V/O and gate/up/down matrix across 80 layers. Its 2102665216 BF16 elements exactly equal both untied embedding/head matrices plus all RMSNorm parameters.",
+        "activation_precision_evidence": "NVIDIA's 2024 model card states that weights and activations of Linear operators inside Transformer blocks are FP8. Every quantized Linear has a scalar FP32 input_scale in the checkpoint.",
+        "kv_precision_evidence": "The pinned hf_quant_config explicitly sets kv_cache_quant_algo to null and config.json declares torch_dtype=bfloat16. NVIDIA's pinned vLLM example supplies no dtype or KV override; contemporary vLLM documentation defines dtype=auto as BF16 for a BF16 model and kv_cache_dtype=auto as the model dtype. Persistent K/V is therefore BF16 for this selected runtime path.",
+        "kv_precision_evidence_grade": "A",
+        "quantization_metadata_capacity": "The safetensors headers contain 560 scalar FP32 weight_scale tensors and 560 scalar FP32 input_scale tensors. All 4480 bytes are included in total_weight_capacity_bytes.",
+        "quantization_metadata_traffic": "The current schema has no batch-shared non-compute metadata field. Engine weight_read_bytes therefore contains matrix payload only; adding the scales as parameter work would falsely add FLOPs, and fixed_cost would apply the wrong per-request normalization.",
+        "runtime_quantization_note": "FP8 conversion operations, temporary activations, TensorRT-LLM engine serialization, kernel padding, and workspace buffers are outside the current static logical-HBM boundary."
+      },
+      "context_note": "131072 is the native Llama 3.1 release context. Every configured C uses full attention and is not a synthetic extrapolation.",
+      "deployment_evidence_note": "The pinned 2024 NVIDIA model card provides TensorRT-LLM and vLLM deployment procedures and reports an H100 FP8 throughput evaluation. NVIDIA NIM 1.1 independently lists optimized FP8 latency and throughput profiles for Llama 3.1 70B Instruct. This configuration is sourced only from the public ModelOpt checkpoint: NIM's serialized tensors, KV dtype, and engine context ceiling were not public and are not assumed to be identical.",
+      "modelopt_version_note": "The pinned hf_quant_config embedded with the weights declares ModelOpt 0.17.0, while the later 2024 model-card text says 0.15.1. The artifact declaration is used for reproducibility; this documentation mismatch does not affect tensor shapes, dtypes, or the workload calculation.",
+      "revision_pin_warning": "The repository's current main revision is not this historical profile: it now declares ModelOpt 0.23.0 and FP8 KV cache. Every architecture, precision, scale, and KV conclusion in this configuration comes from the pinned 2024-08-29 revision 811ca36d86c5e5d63aa07b7c4b7f738c8af0c63e; never refresh it from main.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both BF16 matrices. Decode reads one 16384-byte BF16 embedding row per request, while the full BF16 LM head is read once per scheduler step and amortized across the batch.",
+      "implementation_note": "The logical-superchip baseline excludes physical tensor/pipeline-parallel communication, collective traffic, kernel padding, and temporary activation materialization."
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Yi-34B-200K original 2023 BF16 weight+KV deployment",
+    "max_context_tokens": 200000,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_gqa_projections",
+          "parameters": 7046430720,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_swiglu_ffn",
+          "parameters": 26424115200,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 458752000,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 16,
+      "output_head_parameters": 458752000,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "60 full-context GQA layers",
+        "layers": 60,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 56,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 14336
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "long_context_resource_anchor",
+      "release_date": "2023-11-05",
+      "checkpoint": "01-ai/Yi-34B-200K",
+      "checkpoint_revision": "069cd341d60f4ce4b07ec394e82b79e94f656cf4",
+      "release_artifact_note": "01.AI explicitly identifies revision prefix 069cd341d60f4ce4b07ec394e82b79e94f656cf as the previous Yi-34B-200K version released on 2023-11-05. Hugging Face resolves that prefix to the full revision recorded here. This snapshot preserves the original weights even though the repository revision itself also contains later documentation synchronization.",
+      "architecture_summary": "Dense Llama-style causal decoder-only Transformer with SwiGLU FFN, full-context GQA, RoPE with adjusted base frequency, pre-RMSNorm, and untied input embedding and LM head.",
+      "sources": {
+        "official_release_history": "https://github.com/01-ai/Yi",
+        "official_technical_report_post_release": "https://arxiv.org/abs/2403.04652",
+        "pinned_checkpoint_model_card": "https://huggingface.co/01-ai/Yi-34B-200K/blob/069cd341d60f4ce4b07ec394e82b79e94f656cf4/README.md",
+        "pinned_checkpoint_config": "https://huggingface.co/01-ai/Yi-34B-200K/blob/069cd341d60f4ce4b07ec394e82b79e94f656cf4/config.json",
+        "pinned_tokenizer_config": "https://huggingface.co/01-ai/Yi-34B-200K/blob/069cd341d60f4ce4b07ec394e82b79e94f656cf4/tokenizer_config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/01-ai/Yi-34B-200K/blob/069cd341d60f4ce4b07ec394e82b79e94f656cf4/model.safetensors.index.json",
+        "pinned_revision_api": "https://huggingface.co/api/models/01-ai/Yi-34B-200K/revision/069cd341d60f4ce4b07ec394e82b79e94f656cf4",
+        "transformers_4_34_llama_implementation": "https://github.com/huggingface/transformers/blob/v4.34.0/src/transformers/models/llama/modeling_llama.py"
+      },
+      "architecture": {
+        "hidden_size": 7168,
+        "intermediate_size": 20480,
+        "layers": 60,
+        "query_heads": 56,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 64000,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "sliding_window": null,
+        "position_encoding": "RoPE_ABF",
+        "rope_theta": 5000000,
+        "rope_scaling": null,
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 34,
+        "unit": "billion_parameters",
+        "precision": "official_rounded_model_name"
+      },
+      "parameter_breakdown": {
+        "attention_projections": 7046430720,
+        "dense_swiglu_ffn": 26424115200,
+        "transformer_projection_and_ffn_matrices": 33470545920,
+        "untied_lm_head": 458752000,
+        "engine_matrix_parameters": 33929297920,
+        "untied_input_embedding_capacity_only": 458752000,
+        "all_unique_matrix_parameters": 34388049920,
+        "rmsnorm_parameters": 867328,
+        "exact_safetensors_parameter_elements": 34388917248,
+        "hf_revision_api_reported_bf16_elements": 34388921088,
+        "hf_api_minus_safetensors_index_elements": 3840
+      },
+      "weight_capacity": {
+        "bf16_trainable_weight_payload_bytes": 68777834496,
+        "untied_input_embedding_payload_bytes": 917504000,
+        "quantization_metadata_bytes": 0,
+        "quantization_metadata_status": "not_applicable_to_native_bf16_profile",
+        "total_weight_capacity_bytes": 68777834496,
+        "capacity_note": "The pinned safetensors index reports 68777834496 bytes. Auditing all 543 pinned tensor headers gives 34388917248 BF16 elements, exactly closing the payload at two bytes per element. The revision API aggregate is 3840 elements higher and does not close against the index; this profile therefore uses the pinned index and tensor shapes as capacity authority."
+      },
+      "decode_capacity_anchors": {
+        "kv_bytes_per_history_token_per_request_all_layers": 245760,
+        "kv_capacity_bytes_per_request_at_max_context": 49152000000,
+        "attention_flops_per_context_token_all_layers": 1720320,
+        "attention_flops_per_token_at_max_context": 344064000000,
+        "parameter_flops_per_token": 67858595840
+      },
+      "parameter_count_convention": "Counts parameterized matrices executed for one Decode token. Across 60 layers, Q/K/V/O projections contribute 7046430720 parameters and the three SwiGLU matrices contribute 26424115200; adding the full untied LM head gives 33929297920 active matrix parameters. The separate input embedding is resident capacity but only one BF16 row is read per request. RMSNorm, RoPE, SiLU, attention softmax, and logits materialization are excluded from engine matrix FLOPs.",
+      "precision_profile": {
+        "profile": "official_original_2023_huggingface_native_bfloat16_checkpoint_inference",
+        "weight_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_bits": 16,
+        "kv_bits": 16,
+        "weight_precision_evidence": "The pinned config declares torch_dtype=bfloat16, and every tensor in all seven pinned safetensors shard headers is BF16.",
+        "kv_precision_evidence": "The official model card loads the checkpoint with torch_dtype=auto. In the native BF16 path, Transformers 4.34 retains projected key and value tensors in their execution dtype without a cache dtype override, so persistent KV is BF16.",
+        "quantization_metadata": "not_applicable_to_native_bf16_profile"
+      },
+      "context_profile": {
+        "advertised_max_context_tokens_at_release": 200000,
+        "checkpoint_max_position_embeddings": 200000,
+        "tokenizer_model_max_length": 200000,
+        "base_model_pretraining_sequence_tokens": 4096,
+        "trained_context_tokens_for_exact_2023_snapshot": null,
+        "evaluated_context_tokens_at_release": null,
+        "attention_access": "full",
+        "context_evidence_note": "The 2023 release history advertises a 200K context window and both pinned configuration files set 200000. The later technical report describes lightweight long-context continual pretraining, but it does not version every training/evaluation detail for this exact pre-update snapshot; trained and evaluated maxima therefore remain null rather than being inferred."
+      },
+      "context_note": "200K means exactly 200000 tokens, not 204800. Unlike Mistral 7B SWA, this checkpoint keeps full-context GQA, so Attention work, KV read traffic, and KV capacity all grow linearly with C through the advertised limit. At C=200000, one request retains 49152000000 logical BF16 KV bytes before allocator, paging, workspace, and framework overhead.",
+      "version_boundary_note": "The repository replaced these weights in March 2024 and changed the current configuration, including rope_theta from the original 5000000 to 10000000. Later continued-pretraining and Needle-in-a-Haystack results belong to the updated release and are not attributed to this 2023 sample.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both full 64000-by-7168 matrices; Decode reads one 7168-element BF16 input row per request and the complete LM head once per scheduler step before batch amortization.",
+      "implementation_note": "FlashAttention, sequence parallelism, PagedAttention, and physical tensor-parallel layouts can change runtime implementation but do not reduce the logical full-history GQA work or KV entries counted here. Communication, allocator fragmentation, kernel workspace, and temporary activation traffic remain outside the logical-superchip baseline."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 16,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      4096,
+      8192,
+      32768,
+      131072,
+      200000
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

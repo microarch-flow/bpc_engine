@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Llama 3.1 405B Instruct official mixed FP8/BF16 weight + BF16 KV deployment",
+    "max_context_tokens": 131072,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "fp8_middle_124_layer_swiglu_ffn",
+          "parameters": 324538466304,
+          "weight_bits": 8
+        },
+        {
+          "name": "bf16_all_attention_projections",
+          "parameters": 71873593344,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_boundary_2_layer_swiglu_ffn",
+          "parameters": 5234491392,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 2101346304,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 8,
+      "output_head_parameters": 2101346304,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "126 full-context GQA layers",
+        "layers": 126,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 128,
+              "kv_heads": 8,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 32768
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "flagship_resource_demand",
+      "release_date": "2024-07-23",
+      "checkpoint": "meta-llama/Llama-3.1-405B-Instruct-FP8",
+      "checkpoint_revision": "b9d3de62735f931b9d2431887e665dd72532092c",
+      "architecture_summary": "Dense causal decoder-only Transformer with 126 SwiGLU layers, 128K full-context GQA, Llama 3 RoPE scaling, pre-RMSNorm, and untied input embedding and LM head. The official production checkpoint uses FP8 only for the middle 124 layers' FFN projections; attention and the remaining trainable tensors stay BF16.",
+      "sources": {
+        "official_release": "https://ai.meta.com/blog/meta-llama-3-1/",
+        "official_model_card": "https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/MODEL_CARD.md",
+        "technical_report": "https://arxiv.org/abs/2407.21783",
+        "checkpoint_model_card": "https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct-FP8",
+        "pinned_checkpoint_config": "https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct-FP8/blob/b9d3de62735f931b9d2431887e665dd72532092c/config.json",
+        "checkpoint_api": "https://huggingface.co/api/models/meta-llama/Llama-3.1-405B-Instruct-FP8",
+        "official_huggingface_release_blog": "https://huggingface.co/blog/llama31",
+        "kv_head_correction": "https://huggingface.co/meta-llama/Llama-3.1-405B-Instruct-FP8/discussions/14",
+        "meta_checkpoint_datatypes": "https://github.com/meta-llama/llama-models/blob/709a61fd810157f75fbb314e7287089eec06d9c3/models/llama3_1/api/datatypes.py#L183-L213",
+        "meta_reference_model": "https://github.com/meta-llama/llama-models/blob/709a61fd810157f75fbb314e7287089eec06d9c3/models/llama3_1/api/model.py#L150-L190",
+        "transformers_4_44_fbgemm_fp8": "https://github.com/huggingface/transformers/blob/v4.44.0/src/transformers/integrations/fbgemm_fp8.py"
+      },
+      "architecture": {
+        "hidden_size": 16384,
+        "intermediate_size": 53248,
+        "layers": 126,
+        "query_heads": 128,
+        "kv_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 128256,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "position_encoding": "RoPE",
+        "rope_theta": 500000,
+        "rope_scaling": {
+          "rope_type": "llama3",
+          "factor": 8.0,
+          "original_max_position_embeddings": 8192,
+          "low_freq_factor": 1.0,
+          "high_freq_factor": 4.0
+        },
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 405,
+        "unit": "billion_parameters",
+        "precision": "rounded_model_name"
+      },
+      "parameter_breakdown": {
+        "one_layer_attention_projections": 570425344,
+        "all_attention_projections": 71873593344,
+        "one_layer_swiglu_ffn": 2617245696,
+        "fp8_middle_124_layer_swiglu_ffn": 324538466304,
+        "bf16_boundary_2_layer_swiglu_ffn": 5234491392,
+        "untied_lm_head": 2101346304,
+        "engine_matrix_parameters": 403747897344,
+        "untied_input_embedding_capacity_only": 2101346304,
+        "all_unique_matrix_parameters": 405849243648,
+        "rmsnorm_parameters": 4145152,
+        "exact_trainable_parameter_elements": 405853388800,
+        "checkpoint_fp8_weight_elements": 324538466304,
+        "checkpoint_bf16_trainable_elements": 81314922496,
+        "checkpoint_fp32_scale_elements": 15237120,
+        "checkpoint_tensor_elements_including_scales": 405868625920
+      },
+      "weight_capacity": {
+        "fp8_trainable_weight_payload_bytes": 324538466304,
+        "bf16_trainable_weight_payload_bytes": 162629844992,
+        "weight_payload_bytes": 487168311296,
+        "quantization_metadata_elements": 15237120,
+        "quantization_metadata_dtype": "float32",
+        "quantization_metadata_bytes": 60948480,
+        "quantization_metadata_status": "included_in_capacity_separately_from_weight_payload",
+        "total_weight_capacity_bytes": 487229259776,
+        "capacity_note": "Capacity contains all trainable tensors, including both untied embedding/head matrices and RMSNorm, plus the official checkpoint's FP32 per-output-row FFN weight scales. It excludes tokenizer files and serialization/container overhead."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 807495794688,
+        "fp8_matrix_parameter_flops_per_token": 649076932608,
+        "bf16_matrix_parameter_flops_per_token": 158418862080,
+        "matrix_weight_payload_read_bytes_per_decode_step": 482957328384,
+        "fp32_static_scale_bytes_per_decode_step_if_streamed_once": 60948480,
+        "matrix_weight_plus_scale_bytes_per_decode_step_if_streamed_once": 483018276864,
+        "scale_traffic_engine_status": "excluded_from_engine_result",
+        "attention_flops_per_token_coefficient_times_context": 8257536,
+        "kv_bytes_per_historical_token_per_request": 516096,
+        "kv_capacity_bytes_per_request_at_max_context": 67645734912
+      },
+      "parameter_count_convention": "The engine counts parameterized matrices executed for one Decode token: all Q/K/V/O and SwiGLU projections plus the complete untied LM head. The separate input embedding is resident capacity but Decode reads only one 16384-element BF16 row per request. RMSNorm, RoPE, activation quantization/dequantization, softmax, and other elementwise operations do not enter matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "official_2024_fbgemm_mixed_fp8_bf16_production_checkpoint",
+        "checkpoint_quantization_config": "FBGEMM FP8",
+        "middle_124_layer_ffn_weight_dtype": "float8_e4m3fn",
+        "middle_124_layer_ffn_activation_dtype": "dynamic row-wise float8",
+        "middle_124_layer_ffn_weight_scale_dtype": "float32 per output row",
+        "attention_weight_dtype": "bfloat16",
+        "boundary_2_layer_ffn_weight_dtype": "bfloat16",
+        "embedding_head_norm_dtype": "bfloat16",
+        "kv_dtype": "bfloat16",
+        "weight_precision_evidence": "The technical report and official Hugging Face release describe W8A8 dynamic row-wise FP8 for gate/up/down projections in most middle-layer FFNs, while self-attention and the first/last Transformer layers remain BF16. Official checkpoint tensor totals independently reproduce that split.",
+        "kv_precision_evidence": "The official reference implementation allocates KV cache using the projected query/key execution dtype. Attention remains on the unquantized BF16 path in this checkpoint, so this configuration records persistent KV as BF16. This is implementation-derived evidence rather than an explicit model-card KV declaration.",
+        "kv_precision_evidence_grade": "B",
+        "quantization_metadata_capacity": "The 15237120 FP32 static weight-scale elements are included separately in total_weight_capacity_bytes.",
+        "quantization_metadata_traffic": "The current schema has no batch-shared non-compute weight-metadata traffic field. Adding scales as a parameter group would falsely add FLOPs, while fixed_cost would use the wrong per-request normalization. Engine weight_read_bytes therefore contains matrix payload only; the exact scale bytes are retained above for later schema extension.",
+        "runtime_quantization_note": "Dynamic activation scales, activation quantization/dequantization operations, kernel padding, and temporary buffers are outside the current static logical-HBM workload boundary."
+      },
+      "context_note": "131072 is the native Llama 3.1 release context. The configuration models full attention at every selected C; it does not treat 128K as a synthetic extrapolation.",
+      "checkpoint_revision_note": "The initial FP8 repository state duplicated 16 KV heads from tensor-parallel shards. The pinned 2024-08-16 correction records the actual architecture's 8 KV heads; using the initial index would double KV projection and cache counts.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both full BF16 matrices. Decode reads one 32768-byte BF16 embedding row per request, while the full BF16 LM head is read once per scheduler step and amortized across the batch.",
+      "implementation_note": "The logical-superchip baseline excludes physical tensor/pipeline-parallel communication, collective traffic, kernel padding, and temporary activation materialization."
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

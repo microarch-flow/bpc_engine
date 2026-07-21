@@ -1,0 +1,15 @@
+{
+  "status": "pass",
+  "run_id": "decode-trend-2022-2026ytd-v1-20260720T021944Z",
+  "model_count": 20,
+  "row_count": 3357,
+  "checks": {
+    "rows_checked": 3357,
+    "extrapolated_rows": 1440
+  },
+  "warning_count": 2,
+  "warnings": [
+    "bigscience:bloom-176b:2022-07-12 C=16777216 B=256 batch_cache_bytes exceeds exact IEEE-754 integer range",
+    "zai-org:glm-130b-int4:2022-08-24 C=16777216 B=256 batch_cache_bytes exceeds exact IEEE-754 integer range"
+  ]
+}

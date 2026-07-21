@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Qwen3.6-35B-A3B-FP8 text-only FP8 weight + BF16 KV/state deployment",
+    "max_context_tokens": 262144,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "fp8_gated_deltanet_major_projections",
+          "parameters": 1006632960,
+          "weight_bits": 8
+        },
+        {
+          "name": "bf16_gated_deltanet_small_projections_and_conv",
+          "parameters": 4915200,
+          "weight_bits": 16
+        },
+        {
+          "name": "fp8_full_attention_projections",
+          "parameters": 272629760,
+          "weight_bits": 8
+        },
+        {
+          "name": "fp8_shared_swiglu_experts",
+          "parameters": 125829120,
+          "weight_bits": 8
+        },
+        {
+          "name": "bf16_routers_and_shared_expert_gates",
+          "parameters": 21053440,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 508559360,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "fp8_routed_swiglu_experts",
+          "layers": 40,
+          "expert_count": 256,
+          "selected_per_token": 8,
+          "parameters_per_expert": 3145728,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 8
+        }
+      ],
+      "weight_bits": 8,
+      "output_head_parameters": 508559360,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "30 Gated DeltaNet linear-attention layers",
+        "layers": 30,
+        "mixers": [
+          {
+            "kind": "linear_attention",
+            "query_heads": 32,
+            "key_dim": 128,
+            "value_dim": 128,
+            "normalizer_state": false,
+            "extra_flops_per_token": 1581056,
+            "state_bits": 16
+          },
+          {
+            "kind": "recurrent_state",
+            "state_elements": 24576,
+            "read_elements_per_token": 24576,
+            "write_elements_per_token": 24576,
+            "flops_per_token": 0,
+            "state_bits": 16
+          }
+        ]
+      },
+      {
+        "name": "10 full-context gated GQA layers",
+        "layers": 10,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "gqa",
+              "query_heads": 16,
+              "kv_heads": 2,
+              "head_dim": 256,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 4096
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "mainstream_deployment",
+      "release_date": "2026-04-15",
+      "checkpoint": "Qwen/Qwen3.6-35B-A3B-FP8",
+      "base_checkpoint": "Qwen/Qwen3.6-35B-A3B",
+      "checkpoint_initial_public_revision": "61a5771f218894aaacf97551e24a25b866750fc2",
+      "checkpoint_revision": "95a723d08a9490559dae23d0cff1d9466213d989",
+      "checkpoint_revision_note": "The selected revision is the 2026-04-24 stable snapshot. The initial public FP8 release was 2026-04-15; the later revision updates README text and keeps the deployable FP8 artifact layout.",
+      "architecture_summary": "Multimodal causal language model with a 40-layer text decoder, 30 Gated DeltaNet linear-attention layers, 10 full-context gated GQA layers, MoE in every layer, 256 routed experts with top-8 routing plus one shared expert, a native 262,144-token context, MTP weights, and a vision encoder. This configuration follows the official text-only serving path and excludes vision and MTP from one-token Decode work.",
+      "sources": {
+        "official_blog": "https://qwen.ai/blog?id=qwen3.6-35b-a3b",
+        "pinned_checkpoint_tree": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B-FP8/tree/95a723d08a9490559dae23d0cff1d9466213d989",
+        "pinned_model_card": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B-FP8/blob/95a723d08a9490559dae23d0cff1d9466213d989/README.md",
+        "pinned_checkpoint_config": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B-FP8/blob/95a723d08a9490559dae23d0cff1d9466213d989/config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B-FP8/blob/95a723d08a9490559dae23d0cff1d9466213d989/model.safetensors.index.json",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/Qwen/Qwen3.6-35B-A3B-FP8/revision/95a723d08a9490559dae23d0cff1d9466213d989",
+        "vllm_recipe": "https://docs.vllm.ai/projects/recipes/en/latest/Qwen/Qwen3.5.html"
+      },
+      "architecture": {
+        "text_hidden_size": 2048,
+        "text_layers": 40,
+        "text_vocab_size_padded": 248320,
+        "layer_layout": "10 * (3 * (Gated DeltaNet -> MoE) + 1 * (Gated Attention -> MoE))",
+        "linear_attention_layers": 30,
+        "full_attention_layers": 10,
+        "linear_key_heads": 16,
+        "linear_value_heads": 32,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128,
+        "linear_conv_kernel_dim": 4,
+        "full_query_heads": 16,
+        "full_kv_heads": 2,
+        "full_head_dim": 256,
+        "full_rope_dim": 64,
+        "moe_layers": 40,
+        "experts_per_layer": 256,
+        "selected_routed_experts_per_token": 8,
+        "shared_experts_per_layer": 1,
+        "moe_intermediate_size_per_expert": 512,
+        "shared_expert_intermediate_size": 512,
+        "activation": "SwiGLU",
+        "position_encoding": "M-RoPE for multimodal full-attention layers",
+        "rope_theta": 10000000,
+        "normalization": "RMSNorm plus per-head Q/K norm on full-attention layers",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.000001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "mtp_num_hidden_layers": 1,
+        "vision_encoder": "27-layer Qwen vision encoder",
+        "selected_service_profile": "official vLLM/SGLang standard text-only path without speculative MTP"
+      },
+      "reported_total_parameters": {
+        "value": 35,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "reported_active_parameters": {
+        "value": 3,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "parameter_breakdown": {
+        "one_routed_or_shared_expert_in_one_layer": 3145728,
+        "all_routed_experts": 32212254720,
+        "active_routed_experts_per_token": 1006632960,
+        "all_shared_experts": 125829120,
+        "all_moe_routers": 20971520,
+        "all_shared_expert_gates": 81920,
+        "one_gated_deltanet_big_projection_set": 33554432,
+        "one_gated_deltanet_small_projection_and_conv_set": 163840,
+        "all_gated_deltanet_big_projections": 1006632960,
+        "all_gated_deltanet_small_projections_and_conv": 4915200,
+        "one_full_attention_projection_set": 27262976,
+        "all_full_attention_projections": 272629760,
+        "untied_lm_head": 508559360,
+        "untied_input_embedding_parameter_elements": 508559360,
+        "engine_always_active_matrix_and_conv_parameters": 1939619840,
+        "engine_active_matrix_and_conv_parameters_per_token": 2946252800,
+        "all_unique_text_matrix_and_conv_parameters_including_embedding": 34660433920,
+        "bf16_norm_and_small_state_parameter_elements": 176768,
+        "exact_text_original_model_parameter_elements": 34660610688,
+        "active_parameter_ratio": 0.0850029108408074
+      },
+      "checkpoint_tensor_inventory": {
+        "safetensor_file_count": 42,
+        "tensor_count": 64196,
+        "text_main_tensor_count": 62303,
+        "visual_tensor_count": 333,
+        "mtp_tensor_count": 1560,
+        "total_checkpoint_tensor_payload_bytes": 37454789472,
+        "text_main_tensor_payload_bytes": 35707978496,
+        "visual_tensor_payload_bytes": 893142496,
+        "mtp_tensor_payload_bytes": 853668480,
+        "fp8_text_weight_elements": 33617346560,
+        "bf16_text_original_weight_and_small_parameter_elements": 1043264128,
+        "bf16_fp8_weight_scale_inv_elements": 2051840,
+        "header_audit_note": "All 64,196 tensor names in model.safetensors.index.json were matched against safetensors headers from layers-0..39, outside, and mtp files. The index metadata has no total_size field, so payload capacity is reconstructed from tensor data offsets."
+      },
+      "weight_capacity": {
+        "fp8_text_matrix_payload_bytes": 33617346560,
+        "bf16_text_original_weight_and_small_parameter_payload_bytes": 2086528256,
+        "bf16_weight_scale_inv_bytes": 4103680,
+        "text_decode_weight_capacity_bytes": 35707978496,
+        "visual_encoder_capacity_bytes": 893142496,
+        "mtp_capacity_bytes": 853668480,
+        "total_checkpoint_tensor_capacity_bytes": 37454789472,
+        "capacity_note": "text_decode_weight_capacity_bytes includes FP8 matrix payload, BF16 original text weights/small parameters, and BF16 weight_scale_inv tensors. Vision and MTP are recorded separately because the selected standard text-only Decode profile does not execute them for each output token."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 5892505600,
+        "matrix_weight_payload_read_bytes_at_batch1_excluding_scale_inv": 3480780800,
+        "fp8_scale_inv_read_bytes_at_batch1_if_streamed_once": 4103680,
+        "matrix_payload_plus_scale_inv_bytes_at_batch1_if_streamed_once": 3484884480,
+        "scale_traffic_engine_status": "excluded_from_engine_result",
+        "linear_attention_recurrence_flops_per_layer_per_token": 3678208,
+        "linear_attention_recurrence_flops_all_layers_per_token": 110346240,
+        "full_attention_flops_per_token_coefficient_times_context": 163840,
+        "gqa_kv_bytes_per_historical_token_per_layer": 2048,
+        "gqa_kv_bytes_per_historical_token_all_layers": 20480,
+        "gqa_kv_capacity_bytes_per_request_at_max_context": 5368709120,
+        "gated_deltanet_matrix_state_elements_per_layer": 524288,
+        "gated_deltanet_conv_state_elements_per_layer": 24576,
+        "gated_deltanet_state_capacity_bytes_all_layers": 32931840,
+        "input_embedding_row_read_bytes_per_request": 4096
+      },
+      "precision_profile": {
+        "profile": "official_2026_fp8_e4m3_text_weights_bf16_kv_and_state",
+        "quantization_format": "dynamic FP8 E4M3 weight format with BF16 weight_scale_inv tensors",
+        "large_text_matrix_dtype": "F8_E4M3",
+        "embedding_head_router_small_projection_norm_dtype": "bfloat16",
+        "full_attention_kv_dtype": "bfloat16 by model dtype and default vLLM/SGLang command",
+        "gated_deltanet_state_dtype": "bfloat16 in the selected default cache profile",
+        "weight_precision_evidence": "Pinned safetensors headers show 33,617,346,560 FP8 text matrix elements, 1,043,264,128 BF16 original text elements, and 2,051,840 BF16 weight_scale_inv elements. The model card states this repository contains FP8-quantized model weights.",
+        "kv_precision_evidence": "The model text config declares dtype=bfloat16 and official vLLM/SGLang commands do not override KV dtype. This selected deployment profile therefore uses BF16 GQA KV and BF16 Gated DeltaNet state.",
+        "kv_precision_evidence_grade": "B",
+        "quantization_metadata_traffic": "The current schema cannot express zero-FLOP FP8 scale_inv traffic that is read once per scheduler step and batch-shared. Scale_inv is included in capacity and retained as an optional traffic addend above, but not in engine weight_read_bytes."
+      },
+      "state_note": "The recurrent linear_attention mixer uses the same project convention as Qwen3-Next DeltaNet: 7*state_matrix + 2*heads*value_dim per layer. The selected vLLM-style conv state uses conv_kernel_dim - 1 slots without speculative MTP; enabling MTP would change the state shape and is a separate serving profile.",
+      "context_note": "The model card reports native 262,144-token context and says it is extensible up to 1,010,000 tokens. This configuration uses the native 262,144-token service profile from the official vLLM/SGLang commands.",
+      "multimodal_and_mtp_boundary_note": "The official vLLM card supplies a --language-model-only command that skips vision encoder and multimodal profiling. The standard Decode profile also does not enable speculative MTP. Vision and MTP capacity are recorded in metadata only.",
+      "adoption_observation": {
+        "source": "pinned_checkpoint_api",
+        "observed_at": "2026-07-18",
+        "huggingface_recent_downloads": 7651080,
+        "likes": 317,
+        "interpretation": "Current propagation proxy only; not a historical 2026 token-share measurement."
+      },
+      "routing_note": "No public serving routing trace is available, so batch expert traffic uses the engine's uniform-independent union estimate. It does not model token correlation, expert placement, dispatch, or expert-parallel communication.",
+      "implementation_note": "The logical-superchip baseline excludes tensor/expert-parallel communication, expert dispatch, collectives, kernel padding, temporary activation materialization, vision prefill, MTP draft/verify work, framework workspace, and sampling."
+    }
+  },
+  "deployment": {
+    "weight_bits": 8,
+    "expert_weight_bits": 8,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      262144
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

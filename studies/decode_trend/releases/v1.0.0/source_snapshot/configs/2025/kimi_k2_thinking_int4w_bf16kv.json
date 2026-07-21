@@ -1,0 +1,275 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "Kimi K2 Thinking native routed-expert INT4 weight + BF16 other weight + logical absorbed BF16 MLA-KV deployment",
+    "max_context_tokens": 262144,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "bf16_mla_projections",
+          "parameters": 6168444928,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_dense_layer0_swiglu",
+          "parameters": 396361728,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_shared_swiglu_experts",
+          "parameters": 2642411520,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_moe_routers",
+          "parameters": 165150720,
+          "weight_bits": 16
+        },
+        {
+          "name": "bf16_untied_lm_head",
+          "parameters": 1174405120,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [
+        {
+          "name": "int4_routed_swiglu_experts",
+          "layers": 60,
+          "expert_count": 384,
+          "selected_per_token": 8,
+          "parameters_per_expert": 44040192,
+          "routing_mode": "uniform_independent",
+          "weight_bits": 4
+        }
+      ],
+      "weight_bits": 16,
+      "output_head_parameters": 1174405120,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "61 full-context MLA layers",
+        "layers": 61,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mla",
+              "query_heads": 64,
+              "latent_dim": 512,
+              "rope_dim": 64,
+              "latent_bits": 16,
+              "rope_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 14336
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "flagship_resource_demand",
+      "release_date": "2025-11-06",
+      "checkpoint": "moonshotai/Kimi-K2-Thinking",
+      "checkpoint_revision": "6e3cdad87f3e39a24d887ed53b494ba91bfadced",
+      "checkpoint_revision_note": "This first post-release tokenizer-vocabulary correction keeps the launch weights while making the reserved-token enumeration agree with vocab_size=163840. Architecture, tokenizer, remote code, and deployment guidance are pinned because later revisions changed runtime-facing files.",
+      "architecture_summary": "Sparse MoE causal decoder-only thinking model with 61 MLA layers, one dense SwiGLU layer followed by 60 MoE layers, 384 routed experts with sigmoid noaux_tc top-8 routing plus one always-active shared expert per MoE layer, YaRN-scaled RoPE, pre-RMSNorm, and untied input embedding and LM head. Native QAT INT4 weight-only quantization applies only to routed-expert Linear weights; attention, dense/shared FFNs, routers, embedding, head, and norms remain BF16.",
+      "sources": {
+        "official_release": "https://moonshotai.github.io/Kimi-K2/thinking.html",
+        "official_k2_repository": "https://github.com/MoonshotAI/Kimi-K2",
+        "k2_technical_report": "https://arxiv.org/abs/2507.20534",
+        "pinned_checkpoint_tree": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/tree/6e3cdad87f3e39a24d887ed53b494ba91bfadced",
+        "pinned_model_card": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/blob/6e3cdad87f3e39a24d887ed53b494ba91bfadced/README.md",
+        "pinned_checkpoint_config": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/blob/6e3cdad87f3e39a24d887ed53b494ba91bfadced/config.json",
+        "pinned_checkpoint_index": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/blob/6e3cdad87f3e39a24d887ed53b494ba91bfadced/model.safetensors.index.json",
+        "pinned_reference_implementation": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/blob/6e3cdad87f3e39a24d887ed53b494ba91bfadced/modeling_deepseek.py",
+        "pinned_checkpoint_api": "https://huggingface.co/api/models/moonshotai/Kimi-K2-Thinking/revision/6e3cdad87f3e39a24d887ed53b494ba91bfadced",
+        "pinned_deployment_guide": "https://huggingface.co/moonshotai/Kimi-K2-Thinking/blob/6e3cdad87f3e39a24d887ed53b494ba91bfadced/docs/deploy_guidance.md",
+        "vllm_0_11_1_mla": "https://docs.vllm.ai/en/v0.11.1/api/vllm/model_executor/layers/mla/",
+        "vllm_0_11_1_deepseek_mla_integration": "https://docs.vllm.ai/en/v0.11.1/api/vllm/model_executor/models/deepseek_v2/"
+      },
+      "architecture": {
+        "hidden_size": 7168,
+        "layers": 61,
+        "vocab_size": 163840,
+        "query_heads": 64,
+        "query_lora_rank": 1536,
+        "kv_lora_rank": 512,
+        "qk_nope_head_dim": 128,
+        "qk_rope_head_dim": 64,
+        "value_head_dim": 128,
+        "dense_first_layers": 1,
+        "dense_intermediate_size": 18432,
+        "moe_layers": 60,
+        "moe_intermediate_size_per_expert": 2048,
+        "routed_experts_per_layer": 384,
+        "selected_routed_experts_per_token": 8,
+        "shared_experts_per_layer": 1,
+        "activation": "SwiGLU",
+        "attention_access": "full",
+        "attention_mechanism": "MLA",
+        "position_encoding": "RoPE with YaRN scaling",
+        "rope_theta": 50000,
+        "rope_scaling": {
+          "type": "yarn",
+          "factor": 64.0,
+          "original_max_position_embeddings": 4096,
+          "beta_fast": 1.0,
+          "beta_slow": 1.0,
+          "mscale": 1.0,
+          "mscale_all_dim": 1.0
+        },
+        "normalization": "RMSNorm",
+        "normalization_placement": "pre_norm",
+        "rms_norm_eps": 0.00001,
+        "tie_word_embeddings": false,
+        "linear_bias": false,
+        "sparse_moe": true,
+        "routing_scoring_function": "sigmoid",
+        "routing_method": "noaux_tc",
+        "normalize_topk_probability": true,
+        "routed_scaling_factor": 2.827,
+        "next_token_prediction_layers": 0
+      },
+      "reported_total_parameters": {
+        "value": 1,
+        "unit": "trillion_parameters",
+        "precision": "official_rounded"
+      },
+      "reported_active_parameters": {
+        "value": 32,
+        "unit": "billion_parameters",
+        "precision": "official_rounded"
+      },
+      "parameter_breakdown": {
+        "one_layer_mla_projection_matrices": 101122048,
+        "all_mla_projection_matrices": 6168444928,
+        "dense_layer0_swiglu": 396361728,
+        "one_routed_or_shared_expert_in_one_layer": 44040192,
+        "all_routed_experts": 1014686023680,
+        "active_routed_experts_per_token": 21139292160,
+        "all_shared_experts": 2642411520,
+        "one_moe_router": 2752512,
+        "all_moe_routers": 165150720,
+        "untied_lm_head": 1174405120,
+        "engine_always_active_matrix_parameters": 10546774016,
+        "engine_active_matrix_parameters_per_token": 31686066176,
+        "engine_all_resident_matrix_groups": 1025232797696,
+        "untied_input_embedding_parameter_elements": 1174405120,
+        "all_unique_matrix_parameters": 1026407202816,
+        "rmsnorm_parameter_elements": 1006592,
+        "fp32_router_correction_bias_parameter_elements": 23040,
+        "exact_original_model_parameter_elements": 1026408232448,
+        "total_parameter_elements": 1026408232448,
+        "active_matrix_parameter_elements_per_token": 31686066176,
+        "active_parameter_ratio": 0.030870822324201578
+      },
+      "checkpoint_tensor_inventory": {
+        "hf_api_bf16_elements": 43431131776,
+        "hf_api_f32_elements": 23040,
+        "hf_api_i32_logical_elements": 1014687129600,
+        "hf_api_total_logical_elements": 1058118284416,
+        "actual_packed_i32_container_elements_including_shapes": 126835891200,
+        "checkpoint_bf16_quant_scale_elements": 31708938240,
+        "checkpoint_bf16_rotary_buffer_elements": 7808,
+        "i32_interpretation": "The Hugging Face API expands each packed I32 container element by eight for parameter-count display. The I32 figure is therefore neither a 32-bit deployment precision nor a physical byte count; physical capacity follows safetensors data offsets and the pinned index total_size."
+      },
+      "weight_capacity": {
+        "int4_routed_expert_weight_payload_bytes": 507343011840,
+        "bf16_unquantized_matrix_payload_bytes": 23442358272,
+        "bf16_rmsnorm_parameter_payload_bytes": 2013184,
+        "fp32_router_correction_bias_parameter_payload_bytes": 92160,
+        "original_model_parameter_payload_bytes": 530787475456,
+        "bf16_group_scale_elements": 31708938240,
+        "bf16_group_scale_bytes": 63417876480,
+        "int32_weight_shape_metadata_bytes": 552960,
+        "quantization_metadata_bytes": 63418429440,
+        "quantization_metadata_status": "included_in_capacity_separately_from_original_model_parameter_payload",
+        "weight_payload_bytes": 530787475456,
+        "total_weight_capacity_bytes": 594205904896,
+        "checkpoint_bf16_rotary_buffer_bytes": 15616,
+        "total_checkpoint_tensor_capacity_bytes": 594205920512,
+        "capacity_note": "total_weight_capacity_bytes follows the research definition: original parameter payload plus quantization scales and packed-shape metadata. The additional 15616 bytes are indexed non-parameter RoPE buffers; adding them closes total_checkpoint_tensor_capacity_bytes exactly to the pinned safetensors index metadata.total_size. Tokenizer files and serialization/container overhead are excluded."
+      },
+      "engine_workload_projection": {
+        "matrix_parameter_flops_per_token_before_dynamic_attention": 63372132352,
+        "matrix_weight_payload_read_bytes_at_batch1": 31663194112,
+        "routed_expert_scale_read_bytes_at_batch1_if_streamed_with_selected_experts": 1321205760,
+        "matrix_payload_plus_routed_scale_bytes_at_batch1_if_streamed": 32984399872,
+        "scale_traffic_engine_status": "excluded_from_engine_result",
+        "attention_flops_per_token_coefficient_times_context": 8495104,
+        "mla_kv_bytes_per_historical_token_per_layer": 1152,
+        "mla_kv_bytes_per_historical_token_all_layers": 70272,
+        "mla_kv_capacity_bytes_per_request_at_max_context": 18421383168
+      },
+      "parameter_count_convention": "The engine counts all MLA projection matrices, the dense layer-0 SwiGLU, every router and shared expert, eight routed experts in each of 60 MoE layers, and the complete untied LM head for one Decode token. This gives 31686066176 active matrix elements, consistent with but not replaceable by the rounded official 32B label. The separate input embedding contributes one row read. RMSNorm, router correction-bias addition, RoPE, softmax, routing selection, expert weighting, quantization unpack/dequantization, and other elementwise work are outside matrix-parameter FLOPs.",
+      "precision_profile": {
+        "profile": "official_2025_native_qat_int4_routed_experts_bf16_other_and_kv",
+        "quantization_format": "compressed-tensors pack-quantized",
+        "routed_expert_weight_dtype": "symmetric static INT4, group size 32",
+        "routed_expert_activation_dtype": "unquantized by the checkpoint; BF16 model execution profile",
+        "routed_expert_scale_dtype": "bfloat16",
+        "attention_dense_shared_router_embedding_head_norm_dtype": "bfloat16",
+        "router_correction_bias_dtype": "float32",
+        "kv_dtype": "bfloat16",
+        "weight_precision_evidence": "The official model card states that post-training QAT applies INT4 weight-only quantization to MoE components and reports all benchmarks under INT4. The pinned compressed-tensors ignore rules and tensor index narrow this precisely to routed-expert Linear weights; self-attention, shared experts, dense MLP, LM head, embedding, routers, and norms stay unquantized.",
+        "kv_precision_evidence": "The pinned quantization config has kv_cache_scheme=null, torch_dtype=bfloat16, and excludes self-attention from INT4. The official vLLM and SGLang commands do not override KV dtype, so this profile follows their automatic BF16 KV path.",
+        "kv_precision_evidence_grade": "B",
+        "quantization_metadata_capacity": "Every 32 routed-expert weights share one BF16 scale, adding 0.5 bit per logical routed weight. Scales and packed-shape metadata are included in total checkpoint capacity.",
+        "quantization_metadata_traffic": "The current schema cannot express zero-FLOP scale bytes that follow the same batch-shared expert union as routed weights. Adding scales as parameter groups would create false FLOPs; fixed_cost would repeat them per request; a global multiplier would also inflate BF16 groups. Engine weight_read_bytes therefore contains packed matrix payload only, while the exact omitted scale traffic is retained above.",
+        "runtime_quantization_note": "INT4 unpack/dequantization arithmetic, activation casts, kernel padding, temporary buffers, and on-chip scale residency are outside the current static logical-HBM boundary."
+      },
+      "context_note": "The official model card and evaluations use a 256K context window; the pinned config gives the exact limit 262144. Thinking-token budgets and tool-call trajectories change the number of Decode steps and the context path, not the workload definition of one Decode output token.",
+      "mla_note": "This profile models logically absorbed MLA as implemented by optimized MLA serving paths: each layer retains one 512-element compressed KV latent plus one 64-element decoupled RoPE key per historical token. The pinned generic Transformers remote-code path expands per-head K/V before DynamicCache and is a different physical deployment. Results from an expanded-cache implementation must not be compared as if they used this 576-element logical cache.",
+      "routing_note": "The real model uses sigmoid noaux_tc top-8 routing with a learned FP32 correction bias. No public serving routing trace is available, so batch expert traffic uses the engine's uniform-independent union estimate. It does not reproduce token correlation, load balancing, expert placement, dispatch, or expert-parallel communication.",
+      "active_parameter_note": "The official 1T and 32B figures are rounded. Exact original model parameters are 1026408232448; exact engine active matrix parameters per Decode token are 31686066176. Quantization scales, packed-shape metadata, and non-trainable rotary buffers are checkpoint storage rather than original model parameters.",
+      "embedding_note": "Input embedding and LM head are not tied. Capacity includes both full 163840-by-7168 BF16 matrices. Decode reads one 7168-element BF16 input row per request, while the full BF16 LM head is read once per scheduler step and amortized across the batch.",
+      "implementation_note": "The logical-superchip baseline excludes tensor/expert-parallel communication, expert dispatch, collectives, kernel padding, temporary activation materialization, and framework workspace. The official launch guide's eight-H200 minimum deployment is evidence of deployability, not part of this logical single-chip workload."
+    }
+  },
+  "deployment": {
+    "weight_bits": 16,
+    "expert_weight_bits": 4,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048,
+      8192,
+      32768,
+      131072,
+      262144
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

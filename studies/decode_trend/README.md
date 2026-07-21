@@ -37,22 +37,35 @@ PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/run_decode_trend.py \
 `decode_results.jsonl`、`decode_results.csv` 和 `validation_report.json`。
 超出 release 上下文的点会显式标记 `is_extrapolated=true`。
 
-## 生成20模型正式数据
+## 使用和生成20模型正式数据
 
-在项目根目录执行：
-
-```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -B \
-  scripts/freeze_decode_trend_release.py \
-  --version v1.0.0
-```
-
-命令读取`models.json`中的全部20个模型，生成：
+正式冻结版本`v1.0.0`已随仓库提交，新clone可直接读取：
 
 ```text
 studies/decode_trend/releases/v1.0.0/
 ```
 
+验证冻结文件：
+
+```bash
+cd studies/decode_trend/releases/v1.0.0
+sha256sum -c SHA256SUMS
+```
+
+需要从当前源码生成新的候选版本时，在项目根目录执行：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -B \
+  scripts/freeze_decode_trend_release.py \
+  --version v1.0.1-dev
+```
+
+命令读取`models.json`中的全部20个模型，生成：
+
+```text
+studies/decode_trend/releases/v1.0.1-dev/
+```
+
 版本目录包含完整CSV/JSONL、模型profile、验证报告、配置/源码/文档快照和
-`SHA256SUMS`。`releases/*/`是可复现生成物，已被Git忽略，不应提交。
-版本目录已存在时脚本会拒绝覆盖；重新生成前请使用新的版本号或自行移走旧目录。
+`SHA256SUMS`。未发布的`releases/*/`默认被Git忽略；正式版本需要在`.gitignore`中
+显式放行并提交。版本目录已存在时脚本会拒绝覆盖；重新生成前请使用新的版本号。

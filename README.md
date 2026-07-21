@@ -59,8 +59,9 @@ bpc_engine/
 
 首次使用建议先阅读[字段数据字典](docs/decode_trend_data_dictionary.md)和
 [Decode 趋势指标定义](docs/decode_trend_metrics.md)，再从
-`configs/<year>/`选择模型配置。需要完整20模型研究数据时，按
-[Decode趋势数据生成说明](studies/decode_trend/releases/README.md)执行。
+`configs/<year>/`选择模型配置。正式20模型冻结数据`v1.0.0`已随仓库提交，可直接运行
+P8/P9A分析；校验冻结内容或生成新版本时，参见
+[Decode趋势数据生成说明](studies/decode_trend/releases/README.md)。
 
 ## 1. 最重要的计算口径
 

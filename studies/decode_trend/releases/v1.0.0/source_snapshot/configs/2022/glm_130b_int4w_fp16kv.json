@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "GLM-130B official 2022 INT4-linear FP16-KV deployment",
+    "max_context_tokens": 2048,
+    "weights": {
+      "always_active_parameter_groups": [
+        {
+          "name": "int4_mha_projections",
+          "parameters": 42278584320,
+          "weight_bits": 4
+        },
+        {
+          "name": "int4_geglu_ffn",
+          "parameters": 84557168640,
+          "weight_bits": 4
+        },
+        {
+          "name": "fp16_tied_lm_head",
+          "parameters": 1849688064,
+          "weight_bits": 16
+        }
+      ],
+      "routed_expert_groups": [],
+      "weight_bits": 4,
+      "output_head_parameters": 1849688064,
+      "output_head_weight_bits": 16
+    },
+    "layer_groups": [
+      {
+        "name": "70 full-context MHA layers",
+        "layers": 70,
+        "mixers": [
+          {
+            "kind": "softmax_attention",
+            "kv_layout": {
+              "kind": "mha",
+              "query_heads": 96,
+              "kv_heads": 96,
+              "head_dim": 128,
+              "key_bits": 16,
+              "value_bits": 16
+            },
+            "access": {
+              "kind": "full"
+            }
+          }
+        ]
+      },
+      {
+        "name": "input embedding lookup",
+        "layers": 1,
+        "mixers": [
+          {
+            "kind": "fixed_cost",
+            "prefill_scope": "per_token",
+            "work": {
+              "other_read_bytes": 24576
+            },
+            "cache": {}
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "selection_role": "architecture_evolution_contrast",
+      "release_date": "2022-08-24",
+      "checkpoint": "GLM-130B official INT4 quantized profile",
+      "architecture_summary": "Dense bidirectional GLM Transformer with autoregressive blank infilling, full-context MHA, GeGLU, RoPE, DeepNorm-based Post-LN, and tied input/output embeddings.",
+      "sources": {
+        "release_and_deployment": "https://github.com/zai-org/GLM-130B",
+        "architecture_paper": "https://arxiv.org/abs/2210.02414",
+        "official_int4_config": "https://github.com/zai-org/GLM-130B/blob/main/configs/model_glm_130b_int4.sh",
+        "quantization": "https://github.com/zai-org/GLM-130B/blob/main/docs/quantization.md",
+        "architecture_code_v0_2_12": "https://github.com/THUDM/SwissArmyTransformer/blob/04df080/SwissArmyTransformer/model/official/glm130B_model.py",
+        "base_transformer_code_v0_2_12": "https://github.com/THUDM/SwissArmyTransformer/blob/04df080/SwissArmyTransformer/model/transformer.py"
+      },
+      "architecture": {
+        "hidden_size": 12288,
+        "intermediate_size": 32768,
+        "layers": 70,
+        "query_heads": 96,
+        "kv_heads": 96,
+        "head_dim": 128,
+        "text_token_count": 130000,
+        "padded_embedding_rows": 150528,
+        "activation": "GeGLU",
+        "position_encoding": "RoPE",
+        "layer_normalization": "DeepNorm-based Post-LN",
+        "attention_softmax_dtype": "float32",
+        "pretraining_objective": "autoregressive blank infilling with MASK and gMASK plus multi-task instruction pre-training",
+        "generation_attention_mask": "bidirectional prefix with causal generated span",
+        "tie_word_embeddings": true,
+        "dense_model": true
+      },
+      "reported_total_parameters": {
+        "value": 130,
+        "unit": "billion_parameters",
+        "precision": "rounded_as_reported"
+      },
+      "exact_total_parameters_from_v0_2_12_structure": 128697794560,
+      "parameter_breakdown": {
+        "attention_projections": 42278584320,
+        "dense_geglu_ffn": 84557168640,
+        "tied_lm_head": 1849688064,
+        "quantized_linear_matrix_parameters": 126835752960,
+        "engine_matrix_parameters": 128685441024,
+        "excluded_bias_and_norm_parameters": 12353536
+      },
+      "matrix_weight_storage": {
+        "packed_int4_linear_bytes": 63417876480,
+        "fp16_tied_embedding_head_bytes": 3699376128,
+        "engine_matrix_weight_bytes": 67117252608
+      },
+      "parameter_count_convention": "Counts matrix weights executed for one decode token. The shared 150528-row embedding matrix is counted once as the FP16 LM head, and input lookup is represented by one FP16 row read. Biases, LayerNorm parameters, vector-wise quantization scales, GeGLU/RoPE/softmax elementwise work, and logits materialization are excluded.",
+      "precision_profile": {
+        "profile": "official_2022_int4_quantized_inference",
+        "linear_weight_dtype": "vector_wise_symmetric_int4",
+        "embedding_and_head_dtype": "float16",
+        "activation_dtype": "float16",
+        "kv_dtype": "float16",
+        "linear_weight_bits": 4,
+        "embedding_and_head_bits": 16,
+        "kv_bits": 16,
+        "quantized_modules": "All QKV, attention output, GeGLU input, and FFN output linear matrices.",
+        "unquantized_parameters": "Input/output embedding, LayerNorm, and bias parameters remain FP16.",
+        "runtime_compute": "Packed INT4 linear weights are dynamically converted to FP16 before matrix multiplication.",
+        "quantization_metadata_included": false
+      },
+      "quantization_note": "The engine models logical packed-INT4 HBM reads for quantized matrices and FP16 reads for the tied embedding/head. Vector-wise FP16 scales and the implementation-dependent physical traffic of runtime dequantization are not represented by schema_version 1 and remain outside this baseline.",
+      "context_note": "2048 is the official maximum sequence length and the gMASK generation context used by this release.",
+      "attention_note": "GLM's bidirectional prefix mask changes visibility but not the full-prefix KV capacity or full-prefix scan used by Decode, so it maps to full-context MHA in the engine.",
+      "engine_scope": {
+        "decode_supported": true,
+        "prefill_supported": false,
+        "prefill_note": "The current prefill engine assumes a causal triangular mask and cannot reproduce GLM blank-infilling, bidirectional-prefix, or span-permutation masks. Any mechanically generated prefill result for this config is outside the research boundary."
+      },
+      "deployment_note": "The official INT4 profile runs without weight offload on 4 x RTX 3090 24GB or 8 x RTX 2080 Ti 11GB. This project treats that node as one aggregate compute and memory domain."
+    }
+  },
+  "deployment": {
+    "weight_bits": 4,
+    "expert_weight_bits": 4,
+    "kv_bits": 16,
+    "index_bits": 16,
+    "state_bits": 16,
+    "mac_flops": 2,
+    "include_kv_write": true,
+    "include_index_write": true,
+    "include_state_write": true,
+    "weight_hbm_fraction": 1.0,
+    "kv_hbm_fraction": 1.0,
+    "index_hbm_fraction": 1.0,
+    "state_hbm_fraction": 1.0
+  },
+  "analysis": {
+    "contexts": [
+      128,
+      512,
+      2048
+    ],
+    "batches": [
+      1,
+      32
+    ]
+  }
+}

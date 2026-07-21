@@ -2,5 +2,7 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 
-# Reproducible Decode trend datasets; generate with the documented script.
+# Unpublished Decode trend datasets remain local.  The formal v1.0.0
+# research input is version-controlled so a fresh clone can run P8/P9A.
 /studies/decode_trend/releases/*/
+!/studies/decode_trend/releases/v1.0.0/
